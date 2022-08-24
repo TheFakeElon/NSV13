@@ -4,25 +4,7 @@ Woe betide ye who tread here.
 Been a mess since 2018, we'll fix it someday (probably)
 */
 
-/obj/structure/overmap/fighter/Destroy()
-	var/mob/last_pilot = pilot // Old pilot gets first shot
-	for(var/mob/M as() in operators)
-		stop_piloting(M, eject_mob=FALSE) // We'll handle kicking them out ourselves
-	if(length(mobs_in_ship))
-		var/obj/structure/overmap/fighter/escapepod = null
-		if(ispath(escape_pod_type))
-			escapepod = create_escape_pod(escape_pod_type, last_pilot)
-		if(!escapepod)
-			var/list/copy_of_mobs_in_ship = mobs_in_ship.Copy() //Sometimes you really need to iterate on a list while it's getting modified
-			for(var/mob/living/M in copy_of_mobs_in_ship)
-				to_chat(M, "<span class='warning'>This ship is not equipped with an escape pod! Unable to eject.</span>")
-				M.apply_damage(200)
-				eject(M, force=TRUE)
-
-	kill_boarding_level()
-	return ..()
-
-/obj/structure/overmap/fighter
+/obj/structure/overmap/small_craft
 	name = "Space Fighter"
 	icon = 'nsv13/icons/overmap/nanotrasen/fighter.dmi'
 	icon_state = "fighter"
@@ -32,6 +14,8 @@ Been a mess since 2018, we'll fix it someday (probably)
 	bound_width = 64 //Change this on a per ship basis
 	bound_height = 64
 	mass = MASS_TINY
+	overmap_deletion_traits = DAMAGE_ALWAYS_DELETES
+	deletion_teleports_occupants = TRUE
 	sprite_size = 32
 	damage_states = TRUE
 	faction = "nanotrasen"
@@ -64,71 +48,52 @@ Been a mess since 2018, we'll fix it someday (probably)
 	var/dradis_type =/obj/machinery/computer/ship/dradis/internal
 	var/obj/machinery/computer/ship/navigation/starmap = null
 	var/resize_factor = 1 //How far down should we scale when we fly onto the overmap?
-	var/escape_pod_type = /obj/structure/overmap/fighter/escapepod
+	var/escape_pod_type = /obj/structure/overmap/small_craft/escapepod
 	var/mutable_appearance/canopy
-	var/list/fighter_verbs = list(.verb/toggle_brakes, .verb/toggle_inertia, .verb/toggle_safety, .verb/show_dradis, .verb/overmap_help, .verb/toggle_move_mode, .verb/cycle_firemode,
-								.verb/show_control_panel, .verb/change_name, .verb/countermeasure)
-												 //Countermeasure code in countermeasure_ammo.dm
+	var/random_name = TRUE
+	overmap_verbs = list(.verb/toggle_brakes, .verb/toggle_inertia, .verb/toggle_safety, .verb/show_dradis, .verb/cycle_firemode, .verb/show_control_panel, .verb/change_name, .verb/countermeasure)
 
-/obj/structure/overmap/fighter/verb/show_control_panel()
-	set name = "Show control panel"
-	set category = "Ship"
-	set src = usr.loc
+/obj/structure/overmap/small_craft/Destroy()
+	var/mob/last_pilot = pilot // Old pilot gets first shot
+	for(var/mob/M as() in operators)
+		stop_piloting(M, eject_mob=FALSE) // We'll handle kicking them out ourselves
+	if(length(mobs_in_ship))
+		var/obj/structure/overmap/small_craft/escapepod = null
+		if(ispath(escape_pod_type))
+			escapepod = create_escape_pod(escape_pod_type, last_pilot)
+		if(!escapepod && deletion_teleports_occupants)
+			var/list/copy_of_mobs_in_ship = mobs_in_ship.Copy() //Sometimes you really need to iterate on a list while it's getting modified
+			for(var/mob/living/M in copy_of_mobs_in_ship)
+				to_chat(M, "<span class='warning'>This ship is not equipped with an escape pod! Unable to eject.</span>")
+				M.apply_damage(200)
+				eject(M, force=TRUE)
 
-	if(!verb_check())
-		return
-	ui_interact(usr)
+	last_overmap?.overmaps_in_ship -= src
+	return ..()
 
-/obj/structure/overmap/fighter/verb/change_name()
-	set name = "Change name"
-	set category = "Ship"
-	set src = usr.loc
+/obj/structure/overmap/small_craft/start_piloting(mob/living/carbon/user, position)
+	. = ..()
+	if(.)
+		RegisterSignal(src, COMSIG_MOB_OVERMAP_CHANGE, .proc/pilot_overmap_change)
 
-	if(!verb_check())
-		return
-	var/new_name = stripped_input(usr, message="What do you want to name \
-		your fighter? Keep in mind that particularly terrible names may be \
-		rejected by your employers.", max_length=MAX_CHARTER_LEN)
-	if(!new_name || length(new_name) <= 0)
-		return
-	message_admins("[key_name_admin(usr)] renamed a fighter to [new_name] [ADMIN_LOOKUPFLW(src)].")
-	name = new_name
-
-/obj/structure/overmap/fighter/start_piloting(mob/living/carbon/user, position)
-	user.add_verb(fighter_verbs)
-	..()
-
-/obj/structure/overmap/fighter/key_down(key, client/user)
+/obj/structure/overmap/small_craft/key_down(key, client/user)
 	if(disruption && prob(min(95, disruption)))
 		to_chat(src, "The controls buzz angrily.")
 		playsound(helm, 'sound/machines/buzz-sigh.ogg', 75, 1)
 		return
 	. = ..()
-	var/mob/themob = user.mob
-	switch(key)
-		if("Capslock")
-			if(themob == pilot)
-				toggle_safety()
-			if(helm && prob(80))
-				var/sound = pick(GLOB.computer_beeps)
-				playsound(helm, sound, 100, 1)
-			return TRUE
-		if("5")
-			if(themob == pilot)
-				countermeasure()
-			return TRUE
 
-/obj/structure/overmap/fighter/ui_state(mob/user)
+/obj/structure/overmap/small_craft/ui_state(mob/user)
 	return GLOB.contained_state
 
-/obj/structure/overmap/fighter/ui_interact(mob/user, datum/tgui/ui)
+/obj/structure/overmap/small_craft/ui_interact(mob/user, datum/tgui/ui)
 	ui = SStgui.try_update_ui(user, src, ui)
 	if(!ui)
 		ui = new(user, src, "FighterControls")
 		ui.open()
 		ui.set_autoupdate(TRUE)
 
-/obj/structure/overmap/fighter/ui_data(mob/user)
+/obj/structure/overmap/small_craft/ui_data(mob/user)
 	var/list/data = list()
 	data["obj_integrity"] = obj_integrity
 	data["max_integrity"] = max_integrity
@@ -154,6 +119,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 	data["maintenance_mode"] = maintenance_mode //Todo
 	var/obj/item/fighter_component/docking_computer/DC = loadout.get_slot(HARDPOINT_SLOT_DOCKING)
 	data["docking_mode"] = DC && DC.docking_mode
+	data["docking_cooldown"] = is_docking_on_cooldown()
 	var/obj/item/fighter_component/countermeasure_dispenser/CD = loadout.get_slot(HARDPOINT_SLOT_COUNTERMEASURE)
 	data["countermeasures"] = CD ? CD.charges : 0
 	data["max_countermeasures"] = CD ? CD.max_charges : 0
@@ -181,6 +147,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 	data["ftl_spool_time"] = ftl ? ftl.spoolup_time : FALSE
 	data["jump_ready"] = (ftl?.progress >= ftl?.spoolup_time)
 	data["ftl_active"] = (ftl?.active)
+	data["ftl_target"] = (ftl?.anchored_to?.name)
 
 	for(var/slot in loadout.equippable_slots)
 		var/obj/item/fighter_component/weapon = loadout.hardpoint_slots[slot]
@@ -215,7 +182,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 	data["occupants_info"] = occupants_info
 	return data
 
-/obj/structure/overmap/fighter/ui_act(action, params, datum/tgui/ui)
+/obj/structure/overmap/small_craft/ui_act(action, params, datum/tgui/ui)
 	if(..() || ((usr != pilot) && (!IsAdminGhost(usr))))
 		return
 	if(disruption && prob(min(95, disruption)))
@@ -291,6 +258,9 @@ Been a mess since 2018, we'll fix it someday (probably)
 				return
 			engine.try_start()
 		if("canopy_lock")
+			var/obj/item/fighter_component/canopy/canopy = loadout.get_slot(HARDPOINT_SLOT_CANOPY)
+			if(!canopy)
+				return
 			toggle_canopy()
 		if("docking_mode")
 			var/obj/item/fighter_component/docking_computer/DC = loadout.get_slot(HARDPOINT_SLOT_DOCKING)
@@ -324,30 +294,65 @@ Been a mess since 2018, we'll fix it someday (probably)
 			set_master_caution(FALSE)
 			return
 		if("show_dradis")
-			dradis.ui_interact(usr)
+			dradis?.ui_interact(usr)
 			return
 		if("toggle_ftl")
 			var/obj/item/fighter_component/ftl/ftl = loadout.get_slot(HARDPOINT_SLOT_FTL)
 			if(!ftl)
+				to_chat(usr, "<span class='warning'>FTL unit not properly installed.</span>")
 				return
 			ftl.active = !ftl.active
 			relay('nsv13/sound/effects/fighters/switch.ogg')
-		if("show_starmap")
-			if(!starmap)
+		if("anchor_ftl")
+			message_admins("[usr] called [src]'s anchor_ftl")
+			var/obj/item/fighter_component/ftl/ftl = loadout.get_slot(HARDPOINT_SLOT_FTL)
+			if(!ftl)
+				to_chat(usr, "<span class='warning'>FTL unit not properly installed.</span>")
 				return
-			if(!starmap.linked)
-				starmap.linked = src
-			starmap.ui_interact(usr)
+			var/obj/structure/overmap/new_target = get_overmap()
+			message_admins("get_overmap() returned [new_target]")
+			if(new_target)
+				ftl.anchored_to = new_target
+			else
+				to_chat(usr, "<span class='warning'>Unable to update telemetry. Ensure you are in proximity to a Seegson FTL drive.</span>")
+			relay('nsv13/sound/effects/fighters/switch.ogg')
+		if("return_jump")
+			var/obj/item/fighter_component/ftl/ftl = loadout.get_slot(HARDPOINT_SLOT_FTL)
+			if(!ftl)
+				return
+			if(ftl.ftl_state != FTL_STATE_READY)
+				to_chat(usr, "<span class='warning'>Unable to comply. FTL vector calculation still in progress.</span>")
+				return
+			var/obj/structure/overmap/mothership = ftl.anchored_to
+			if(!mothership)
+				to_chat(usr, "<span class='warning'>Unable to comply. FTL tether lost.</span>")
+				return
+			var/datum/star_system/dest = SSstar_system.ships[mothership]["current_system"]
+			if(!dest)
+				to_chat(usr, "<span class='warning'>Unable to comply. Target beacon is currently in FTL transit.</span>")
+				return
+			ftl.jump(dest)
 			return
-
+		if("set_name")
+			var/new_name = stripped_input(usr, message="What do you want to name \
+				your fighter? Keep in mind that particularly terrible names may be \
+				rejected by your employers.", max_length=MAX_CHARTER_LEN)
+			if(!new_name || length(new_name) <= 0)
+				return
+			message_admins("[key_name_admin(usr)] renamed a fighter to [new_name] [ADMIN_LOOKUPFLW(src)].")
+			name = new_name
+			return
+		if("toggle_maintenance")
+			maintenance_mode = !maintenance_mode
+			return
 
 	relay('nsv13/sound/effects/fighters/switch.ogg')
 
 // Bypass the z level checks done by parent
-/obj/structure/overmap/fighter/forceMove(atom/destination)
+/obj/structure/overmap/small_craft/forceMove(atom/destination)
 	return doMove(destination)
 
-/obj/structure/overmap/fighter/light
+/obj/structure/overmap/small_craft/combat/light
 	name = "Su-818 Rapier"
 	desc = "An Su-818 Rapier space superiorty fighter craft. Designed for high maneuvreability and maximum combat effectivness against other similar weight classes."
 	icon = 'nsv13/icons/overmap/nanotrasen/fighter.dmi'
@@ -373,7 +378,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 						/obj/item/fighter_component/battery,
 						/obj/item/fighter_component/primary/cannon)
 
-/obj/structure/overmap/fighter/escapepod
+/obj/structure/overmap/small_craft/escapepod
 	name = "Escape Pod"
 	desc = "An escape pod launched from a space faring vessel. It only has very limited thrusters and is thus very slow."
 	icon = 'nsv13/icons/overmap/nanotrasen/escape_pod.dmi'
@@ -402,12 +407,12 @@ Been a mess since 2018, we'll fix it someday (probably)
 						/obj/item/fighter_component/countermeasure_dispenser)
 
 
-/obj/structure/overmap/fighter/escapepod/stop_piloting(mob/living/M, eject_mob=TRUE, force=FALSE)
+/obj/structure/overmap/small_craft/escapepod/stop_piloting(mob/living/M, eject_mob=TRUE, force=FALSE)
 	if(!SSmapping.level_trait(z, ZTRAIT_BOARDABLE))
 		return FALSE
 	return ..()
 
-/obj/structure/overmap/fighter/heavy
+/obj/structure/overmap/small_craft/combat/heavy
 	name = "Su-410 Scimitar"
 	desc = "An Su-410 Scimitar heavy attack craft. It's a lot beefier than its Rapier cousin and is designed to take out capital ships, due to the weight of its modules however, it is extremely slow."
 	icon = 'nsv13/icons/overmap/nanotrasen/heavy_fighter.dmi'
@@ -438,7 +443,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 						/obj/item/fighter_component/primary/cannon/heavy)
 
 //Syndie counterparts.
-/obj/structure/overmap/fighter/light/syndicate //PVP MODE
+/obj/structure/overmap/small_craft/combat/light/syndicate //PVP MODE
 	name = "Syndicate Light Fighter"
 	desc = "The Syndicate's answer to Nanotrasen's light fighter craft, this fighter is designed to maintain aerial supremacy."
 	icon = 'nsv13/icons/overmap/syndicate/syn_viper.dmi'
@@ -446,8 +451,10 @@ Been a mess since 2018, we'll fix it someday (probably)
 	faction = "syndicate"
 	start_emagged = TRUE
 
-/obj/structure/overmap/fighter/Initialize(mapload, list/build_components=components)
+/obj/structure/overmap/small_craft/Initialize(mapload, list/build_components=components)
 	. = ..()
+	if(random_name)
+		name = generate_fighter_name()
 	apply_weapons()
 	loadout = AddComponent(loadout_type)
 	if(dradis_type)
@@ -455,11 +462,11 @@ Been a mess since 2018, we'll fix it someday (probably)
 		dradis.linked = src
 	set_light(4)
 	obj_integrity = max_integrity
-	RegisterSignal(src, COMSIG_MOVABLE_MOVED, .proc/check_overmap_elegibility) //Used to smoothly transition from ship to overmap
+	RegisterSignal(src, COMSIG_MOVABLE_MOVED, .proc/handle_moved) //Used to smoothly transition from ship to overmap
 	var/obj/item/fighter_component/engine/engineGoesLast = null
 	if(build_components.len)
 		for(var/Ctype in build_components)
-			var/obj/item/fighter_component/FC = new Ctype(get_turf(src))
+			var/obj/item/fighter_component/FC = new Ctype(get_turf(src), mapload)
 			if(istype(FC, /obj/item/fighter_component/engine))
 				engineGoesLast = FC
 				continue
@@ -475,7 +482,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 	add_overlay(canopy)
 	update_visuals()
 
-/obj/structure/overmap/fighter/attackby(obj/item/W, mob/user, params)
+/obj/structure/overmap/small_craft/attackby(obj/item/W, mob/user, params)
 	if(operators && LAZYFIND(operators, user))
 		to_chat(user, "<span class='warning'>You can't reach [src]'s exterior from in here..</span>")
 		return FALSE
@@ -489,7 +496,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 		return FALSE
 	..()
 
-/obj/structure/overmap/fighter/MouseDrop_T(atom/movable/target, mob/user)
+/obj/structure/overmap/small_craft/MouseDrop_T(atom/movable/target, mob/user)
 	. = ..()
 	if(!isliving(user))
 		return FALSE
@@ -512,24 +519,26 @@ Been a mess since 2018, we'll fix it someday (probably)
 	else
 		to_chat(user, "<span class='warning'>Access denied.</span>")
 
-/obj/structure/overmap/fighter/proc/enter(mob/user)
+/obj/structure/overmap/small_craft/proc/enter(mob/user)
 	var/obj/structure/overmap/OM = user.get_overmap()
 	if(OM)
 		OM.mobs_in_ship -= user
 	user.forceMove(src)
-	mobs_in_ship += user
+	mobs_in_ship |= user
 	if((user.client?.prefs.toggles & SOUND_AMBIENCE) && user.can_hear_ambience() && engines_active()) //Disable ambient sounds to shut up the noises.
 		SEND_SOUND(user, sound('nsv13/sound/effects/fighters/cockpit.ogg', repeat = TRUE, wait = 0, volume = 50, channel=CHANNEL_SHIP_ALERT))
 
-/obj/structure/overmap/fighter/stop_piloting(mob/living/M, eject_mob=TRUE, force=FALSE)
+/obj/structure/overmap/small_craft/stop_piloting(mob/living/M, eject_mob=TRUE, force=FALSE)
 	if(eject_mob && !eject(M, force))
 		return FALSE
+	UnregisterSignal(src, COMSIG_MOB_OVERMAP_CHANGE)
 	M.stop_sound_channel(CHANNEL_SHIP_ALERT)
-	M.remove_verb(fighter_verbs)
+	M.remove_verb(overmap_verbs)
 	return ..()
 
-/obj/structure/overmap/fighter/proc/eject(mob/living/M, force=FALSE)
-	if(!canopy_open && !force)
+/obj/structure/overmap/small_craft/proc/eject(mob/living/M, force=FALSE)
+	var/obj/item/fighter_component/canopy/C = loadout.get_slot(HARDPOINT_SLOT_CANOPY)
+	if(!canopy_open && C && !force)
 		to_chat(M, "<span class='warning'>[src]'s canopy isn't open.</span>")
 		if(prob(50))
 			playsound(src, 'sound/effects/glasshit.ogg', 75, 1)
@@ -537,7 +546,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 			visible_message("<span class='warning'>You hear a muffled thud.</span>")
 		return FALSE
 
-	if(!force && !SSmapping.level_trait(z, ZTRAIT_BOARDABLE))
+	if(!force && !SSmapping.level_trait(z, ZTRAIT_BOARDABLE) && !SSmapping.level_trait(z, ZTRAIT_RESERVED))
 		to_chat(M, "<span class='warning'>[src] won't let you jump out of it mid flight.</span>")
 		return FALSE
 
@@ -546,20 +555,28 @@ Been a mess since 2018, we'll fix it someday (probably)
 	M.forceMove(get_turf(src))
 	return TRUE
 
-/obj/structure/overmap/fighter/escapepod/eject(mob/living/M, force=FALSE)
+/obj/structure/overmap/small_craft/proc/pilot_overmap_change(mob/living/M, obj/structure/overmap/newOM) // in case we get forceMoved outside of the ship somehow
+	SIGNAL_HANDLER
+	if(newOM != src)
+		INVOKE_ASYNC(src, .proc/stop_piloting, M, FALSE, TRUE)
+
+/obj/structure/overmap/small_craft/escapepod/eject(mob/living/M, force=FALSE)
 	. = ..()
 	if(. && !length(mobs_in_ship) && !(QDELETED(src) || QDESTROYING(src))) // Last one out means we don't need this anymore
 		qdel(src)
 
-/obj/structure/overmap/fighter/proc/create_escape_pod(path, mob/last_pilot)
+/obj/structure/overmap/small_craft/proc/create_escape_pod(path, mob/last_pilot)
 	// Create pod
-	var/obj/structure/overmap/fighter/escapepod/escape_pod = new path(get_turf(src))
+	var/obj/structure/overmap/small_craft/escapepod/escape_pod = new path(get_turf(src))
 	if(!istype(escape_pod))
 		message_admins("Unable to create escape pod for [src] with path [path]")
 		qdel(escape_pod)
 		return
 	escape_pod.name = "[name] - escape pod"
 	escape_pod.faction = faction
+	escape_pod.last_overmap = last_overmap
+	escape_pod.current_system = current_system
+	current_system.system_contents += escape_pod
 	escape_pod.desired_angle = 0
 	escape_pod.user_thrust_dir = NORTH
 	var/obj/item/fighter_component/docking_computer/DC = escape_pod.loadout.get_slot(HARDPOINT_SLOT_DOCKING)
@@ -572,27 +589,27 @@ Been a mess since 2018, we'll fix it someday (probably)
 		visible_message("<span class=userdanger>Auto-Ejection Sequence Enabled! Escape Pod Launched!</span>")
 
 		if(last_pilot && !last_pilot.incapacitated())
-			last_pilot.forceMove(escape_pod)
+			last_pilot.doMove(escape_pod)
 			escape_pod.start_piloting(last_pilot, "pilot")
 			escape_pod.attack_hand(last_pilot) // Bring up UI
 			mobs_in_ship -= last_pilot
-			escape_pod.mobs_in_ship += last_pilot
+			escape_pod.mobs_in_ship |= last_pilot
 			last_pilot.overmap_ship = escape_pod
 
 		for(var/mob/M as() in mobs_in_ship)
-			M.forceMove(escape_pod)
+			M.doMove(escape_pod)
 			if(!escape_pod.pilot || escape_pod.pilot.incapacitated()) // Someone please drive this thing
 				escape_pod.start_piloting(M, "pilot")
 				escape_pod.ui_interact(M)
 			else
 				escape_pod.start_piloting(M, "observer")
-			escape_pod.mobs_in_ship += M
+			escape_pod.mobs_in_ship |= M
 			M.overmap_ship = escape_pod
 	mobs_in_ship.Cut()
 
 	return escape_pod
 
-/obj/structure/overmap/fighter/attack_hand(mob/user)
+/obj/structure/overmap/small_craft/attack_hand(mob/user)
 	. = ..()
 	if(allowed(user))
 		if(pilot)
@@ -603,9 +620,18 @@ Been a mess since 2018, we'll fix it someday (probably)
 			start_piloting(user, "all_positions")
 			to_chat(user, "<span class='notice'>You climb into [src]'s cockpit.</span>")
 			ui_interact(user)
+			to_chat(user, "<span class='notice'>Small craft use directional keys (WASD in hotkey mode) to accelerate/decelerate in a given direction and the mouse to change the direction of craft.\
+						Mouse 1 will fire the selected weapon (if applicable).</span>")
+			to_chat(user, "<span class='warning'>=Hotkeys=</span>")
+			to_chat(user, "<span class='notice'>Use <b>tab</b> to activate hotkey mode, then:</span>")
+			to_chat(user, "<span class='notice'>Use the <b> Ctrl + Scroll Wheel</b> to zoom in / out. \
+						Press <b>Space</b> to cycle fire modes. \
+						Press <b>X</b> to cycle inertial dampners. \
+						Press <b>Alt<b> to cycle the handbrake. \
+						Press <b>C<b> to cycle mouse free movement.</span>")
 			return TRUE
 
-/obj/structure/overmap/fighter/proc/force_eject(force = FALSE)
+/obj/structure/overmap/small_craft/proc/force_eject(force = FALSE)
 	. = list()
 	brakes = TRUE
 	if(!canopy_open)
@@ -613,12 +639,12 @@ Been a mess since 2018, we'll fix it someday (probably)
 		playsound(src, 'nsv13/sound/effects/fighters/canopy.ogg', 100, 1)
 	for(var/mob/M in mobs_in_ship)
 		stop_piloting(M, force)
-		M.forceMove(get_turf(src)) // we can use doMove because we already know we're moving to a safe turf.
+		M.forceMove(get_turf(src))
 		to_chat(M, "<span class='warning'>You have been remotely ejected from [src]!.</span>")
 		. += M
 
 //Iconic proc.
-/obj/structure/overmap/fighter/proc/foo()
+/obj/structure/overmap/small_craft/proc/foo()
 	set_fuel(1000)
 	var/obj/item/fighter_component/apu/APU = loadout.get_slot(HARDPOINT_SLOT_APU)
 	APU.fuel_line = TRUE
@@ -632,7 +658,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 	forceMove(locate(250, y, z))
 	//check_overmap_elegibility(TRUE)
 
-/obj/structure/overmap/fighter/proc/throw_pilot(damage = 200) //Used when yeeting a pilot out of an exploding ship
+/obj/structure/overmap/small_craft/proc/throw_pilot(damage = 200) //Used when yeeting a pilot out of an exploding ship
 	if(SSmapping.level_trait(z, ZTRAIT_OVERMAP)) //Check if we're on the overmap
 		damage *= 2
 	var/list/victims = force_eject(TRUE)
@@ -640,7 +666,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 		M.apply_damage(damage)
 
 
-/obj/structure/overmap/fighter/attackby(obj/item/W, mob/user, params)   //fueling and changing equipment
+/obj/structure/overmap/small_craft/attackby(obj/item/W, mob/user, params)   //fueling and changing equipment
 	add_fingerprint(user)
 	if(istype(W, /obj/item/card/id) || istype(W, /obj/item/pda) && length(operators))
 		if(!allowed(user))
@@ -677,7 +703,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 	return ..()
 
 
-/obj/structure/overmap/fighter/take_damage(damage_amount, damage_type, damage_flag, sound_effect)
+/obj/structure/overmap/small_craft/take_damage(damage_amount, damage_type, damage_flag, sound_effect)
 	var/obj/item/fighter_component/armour_plating/A = loadout.get_slot(HARDPOINT_SLOT_ARMOUR)
 	if(A && istype(A))
 		A.take_damage(damage_amount, damage_type, damage_flag, sound_effect)
@@ -700,7 +726,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 		if(C.obj_integrity <= 0)
 			canopy_breach(C)
 
-/obj/structure/overmap/fighter/proc/canopy_breach(obj/item/fighter_component/canopy/C)
+/obj/structure/overmap/small_craft/proc/canopy_breach(obj/item/fighter_component/canopy/C)
 	set waitfor = FALSE
 	relay('nsv13/sound/effects/ship/cockpit_breach.ogg') //We're leaking air!
 	loadout.remove_hardpoint(HARDPOINT_SLOT_CANOPY, TRUE)
@@ -709,7 +735,7 @@ Been a mess since 2018, we'll fix it someday (probably)
 	sleep(2 SECONDS)
 	relay('nsv13/sound/effects/ship/reactor/gasmask.ogg', "<span class='warning'>The air around you rushes out of the breached canopy!</span>", loop = FALSE, channel = CHANNEL_SHIP_ALERT)
 
-/obj/structure/overmap/fighter/welder_act(mob/living/user, obj/item/I)
+/obj/structure/overmap/small_craft/welder_act(mob/living/user, obj/item/I)
 	. = ..()
 	if(obj_integrity >= max_integrity)
 		to_chat(user, "<span class='notice'>[src] isn't in need of repairs.</span>")
@@ -719,6 +745,33 @@ Been a mess since 2018, we'll fix it someday (probably)
 		to_chat(user, "<span class='notice'>You weld some dents out of [src]'s hull.</span>")
 		obj_integrity += min(10, max_integrity-obj_integrity)
 		return TRUE
+
+/obj/structure/overmap/small_craft/InterceptClickOn(mob/user, params, atom/target)
+	if(user.incapacitated() || !isliving(user))
+		return FALSE
+	if((target == src) && (user == pilot))
+		helm?.ui_interact(user)
+		return FALSE
+	if((target == src) && (user == gunner))
+		tactical?.ui_interact(user)
+		return FALSE
+	return ..()
+
+/obj/structure/overmap/small_craft/can_friendly_fire()
+	if(fire_mode == 1)
+		var/obj/item/fighter_component/primary/P = loadout.get_slot(HARDPOINT_SLOT_UTILITY_PRIMARY)
+		return (P && istype(P) && P.bypass_safety)
+	else if(fire_mode == 2)
+		var/obj/item/fighter_component/secondary/S = loadout.get_slot(HARDPOINT_SLOT_UTILITY_SECONDARY)
+		return (S && istype(S) && S.bypass_safety)
+	return FALSE
+
+/obj/structure/overmap/small_craft/try_repair(amount)
+	if(obj_integrity < max_integrity)
+		..()
+	else
+		var/obj/item/fighter_component/armour_plating/armour = loadout.get_slot(HARDPOINT_SLOT_ARMOUR)
+		armour.obj_integrity = CLAMP(armour.obj_integrity + amount, 0, armour.max_integrity)
 
 /datum/component/ship_loadout
 	can_transfer = FALSE
@@ -833,11 +886,11 @@ due_to_damage: Was this called voluntarily (FALSE) or due to damage / external c
 	return TRUE
 
 //Allows you to jumpstart a fighter with an inducer.
-/obj/structure/overmap/fighter/get_cell()
+/obj/structure/overmap/small_craft/get_cell()
 	return loadout.get_slot(HARDPOINT_SLOT_BATTERY)
 
 /obj/item/fighter_component/proc/powered()
-	var/obj/structure/overmap/fighter/F = loc
+	var/obj/structure/overmap/small_craft/F = loc
 	if(!istype(F) || !active)
 		return FALSE
 	var/obj/item/fighter_component/battery/B = F.loadout.get_slot(HARDPOINT_SLOT_BATTERY)
@@ -991,7 +1044,7 @@ due_to_damage: If the removal was caused voluntarily (FALSE), or if it was cause
 	charge -= amount
 	charge = CLAMP(charge, 0, maxcharge)
 	if(charge <= 0)
-		var/obj/structure/overmap/fighter/F = loc
+		var/obj/structure/overmap/small_craft/F = loc
 		if(!istype(F))
 			return FALSE
 		if(active)
@@ -1027,22 +1080,27 @@ due_to_damage: If the removal was caused voluntarily (FALSE), or if it was cause
 	target.obj_integrity = CLAMP(target.obj_integrity, 0, target.max_integrity)
 
 //Fuel
-/obj/structure/overmap/fighter/proc/get_fuel()
+/obj/structure/overmap/small_craft/proc/get_fuel()
 	var/obj/item/fighter_component/fuel_tank/ft = loadout.get_slot(HARDPOINT_SLOT_FUEL)
 	var/datum/reagent/cryogenic_fuel/F = locate() in ft?.reagents.reagent_list
 	return F ? F.volume : 0
 
-/obj/structure/overmap/fighter/proc/set_fuel(amount)
+/obj/structure/overmap/small_craft/proc/set_fuel(amount)
 	var/obj/item/fighter_component/fuel_tank/ft = loadout.get_slot(HARDPOINT_SLOT_FUEL)
-	ft?.reagents.add_reagent(/datum/reagent/cryogenic_fuel, 1) //Assert that we have this reagent in the tank.
-	var/datum/reagent/cryogenic_fuel/F = locate() in ft?.reagents.reagent_list
-	return F ? F.volume : 0
+	if(!ft)
+		return FALSE
+	ft.reagents.add_reagent(/datum/reagent/cryogenic_fuel, amount, reagtemp = 40) //Assert that we have this reagent in the tank.
+	for(var/datum/reagent/cryogenic_fuel/F in ft?.reagents.reagent_list)
+		if(!istype(F))
+			continue
+		F.volume = amount
+	return amount
 
-/obj/structure/overmap/fighter/proc/engines_active()
+/obj/structure/overmap/small_craft/proc/engines_active()
 	var/obj/item/fighter_component/engine/E = loadout.get_slot(HARDPOINT_SLOT_ENGINE)//E's are good E's are good, he's ebeneezer goode.
 	return E?.active() && get_fuel() > 0
 
-/obj/structure/overmap/fighter/proc/set_master_caution(state)
+/obj/structure/overmap/small_craft/proc/set_master_caution(state)
 	var/master_caution_switch = state
 	if(master_caution_switch)
 		relay('nsv13/sound/effects/fighters/master_caution.ogg', null, loop=TRUE, channel=CHANNEL_HEARTBEAT)
@@ -1051,7 +1109,7 @@ due_to_damage: If the removal was caused voluntarily (FALSE), or if it was cause
 		stop_relay(CHANNEL_HEARTBEAT) //CONSIDER MAKING OWN CHANNEL
 		master_caution = FALSE
 
-/obj/structure/overmap/fighter/proc/use_fuel(force=FALSE)
+/obj/structure/overmap/small_craft/proc/use_fuel(force=FALSE)
 	if(!engines_active() && !force) //No fuel? don't spam them with master cautions / use any fuel
 		return FALSE
 	var/fuel_consumption = 0.5*(loadout.get_slot(HARDPOINT_SLOT_ENGINE)?.tier)
@@ -1065,20 +1123,20 @@ due_to_damage: If the removal was caused voluntarily (FALSE), or if it was cause
 	set_master_caution(TRUE)
 	return FALSE
 
-/obj/structure/overmap/fighter/can_move()
+/obj/structure/overmap/small_craft/can_move()
 	return (engines_active())
 
-/obj/structure/overmap/fighter/escapepod/can_move()
+/obj/structure/overmap/small_craft/escapepod/can_move()
 	return TRUE
 
-/obj/structure/overmap/fighter/escapepod/engines_active()
+/obj/structure/overmap/small_craft/escapepod/engines_active()
 	return TRUE
 
-/obj/structure/overmap/fighter/proc/empty_fuel_tank()//Debug purposes, for when you need to drain a fighter's tank entirely.
+/obj/structure/overmap/small_craft/proc/empty_fuel_tank()//Debug purposes, for when you need to drain a fighter's tank entirely.
 	var/obj/item/fighter_component/fuel_tank/ft = loadout.get_slot(HARDPOINT_SLOT_FUEL)
 	ft?.reagents.clear_reagents()
 
-/obj/structure/overmap/fighter/proc/get_max_fuel()
+/obj/structure/overmap/small_craft/proc/get_max_fuel()
 	var/obj/item/fighter_component/fuel_tank/ft = loadout.get_slot(HARDPOINT_SLOT_FUEL)
 	if(!ft)
 		return 0
@@ -1094,6 +1152,7 @@ due_to_damage: If the removal was caused voluntarily (FALSE), or if it was cause
 /obj/item/fighter_component/fuel_tank/Initialize()
 	. = ..()
 	create_reagents(fuel_capacity, DRAINABLE | AMOUNT_VISIBLE)
+	reagents.chem_temp = 40
 
 /obj/item/fighter_component/fuel_tank/tier2
 	name = "fighter extended fuel tank"
@@ -1131,7 +1190,7 @@ due_to_damage: If the removal was caused voluntarily (FALSE), or if it was cause
 	return (active && obj_integrity > 0 && rpm >= ENGINE_RPM_SPUN && !flooded)
 
 /obj/item/fighter_component/engine/process()
-	var/obj/structure/overmap/fighter/F = loc
+	var/obj/structure/overmap/small_craft/F = loc
 	if(!istype(F))
 		return FALSE
 	var/obj/item/fighter_component/apu/APU = F.loadout.get_slot(HARDPOINT_SLOT_APU)
@@ -1158,7 +1217,7 @@ due_to_damage: If the removal was caused voluntarily (FALSE), or if it was cause
 	rpm = CLAMP(rpm, 0, ENGINE_RPM_SPUN)
 
 /obj/item/fighter_component/engine/proc/try_start()
-	var/obj/structure/overmap/fighter/F = loc
+	var/obj/structure/overmap/small_craft/F = loc
 	if(!istype(F))
 		return FALSE
 	if(rpm >= ENGINE_RPM_SPUN-200) //You get a small bit of leeway.
@@ -1190,7 +1249,7 @@ due_to_damage: If the removal was caused voluntarily (FALSE), or if it was cause
 	icon_state = "engine_tier3"
 	tier = 3
 
-/obj/item/fighter_component/engine/on_install(obj/structure/overmap/fighter/target)
+/obj/item/fighter_component/engine/on_install(obj/structure/overmap/small_craft/target)
 	..()
 	target.speed_limit = initial(target.speed_limit)*tier
 	target.forward_maxthrust = initial(target.forward_maxthrust)*tier
@@ -1304,7 +1363,7 @@ due_to_damage: If the removal was caused voluntarily (FALSE), or if it was cause
 		return
 	if(world.time < next_process)
 		return
-	var/obj/structure/overmap/fighter/F = loc
+	var/obj/structure/overmap/small_craft/F = loc
 	if(!istype(F))
 		return FALSE
 	next_process = world.time + 4 SECONDS
@@ -1350,6 +1409,7 @@ Utility modules can be either one of these types, just ensure you set its slot t
 	var/list/ammo = list()
 	var/burst_size = 1
 	var/fire_delay = 0
+	var/bypass_safety = FALSE
 
 /obj/item/fighter_component/primary/dump_contents()
 	. = ..()
@@ -1366,7 +1426,7 @@ Utility modules can be either one of these types, just ensure you set its slot t
 	return magazine ? magazine.max_ammo : 500 //Default.
 
 //Ensure we get the genericised equipment mounts.
-/obj/structure/overmap/fighter/apply_weapons()
+/obj/structure/overmap/small_craft/apply_weapons()
 	if(!weapon_types[FIRE_MODE_ANTI_AIR])
 		weapon_types[FIRE_MODE_ANTI_AIR] = new/datum/ship_weapon/fighter_primary(src)
 	if(!weapon_types[FIRE_MODE_TORPEDO])
@@ -1377,8 +1437,8 @@ Utility modules can be either one of these types, just ensure you set its slot t
 	hardpoint_fire(target, FIRE_MODE_ANTI_AIR)
 
 /obj/structure/overmap/proc/hardpoint_fire(obj/structure/overmap/target, fireMode)
-	if(istype(src, /obj/structure/overmap/fighter))
-		var/obj/structure/overmap/fighter/F = src
+	if(istype(src, /obj/structure/overmap/small_craft) && !pilot.incapacitated())
+		var/obj/structure/overmap/small_craft/F = src
 		for(var/slot in F.loadout.equippable_slots)
 			var/obj/item/fighter_component/weapon = F.loadout.hardpoint_slots[slot]
 			//Look for any "primary" hardpoints, be those guns or utility slots
@@ -1399,9 +1459,13 @@ Utility modules can be either one of these types, just ensure you set its slot t
 /obj/item/fighter_component/primary/load(obj/structure/overmap/target, atom/movable/AM)
 	if(!istype(AM, accepted_ammo))
 		return FALSE
-	magazine?.forceMove(get_turf(target))
-	if(!SSmapping.level_trait(loc.z, ZTRAIT_BOARDABLE))
-		qdel(magazine) //So bullets don't drop onto the overmap.
+	if(magazine)
+		if(magazine.ammo_count() >= magazine.max_ammo)
+			return FALSE
+		else
+			magazine.forceMove(get_turf(target))
+			if(!SSmapping.level_trait(loc.z, ZTRAIT_BOARDABLE))
+				QDEL_NULL(magazine) //So bullets don't drop onto the overmap.
 	AM.forceMove(src)
 	magazine = AM
 	ammo = magazine.stored_ammo
@@ -1409,7 +1473,7 @@ Utility modules can be either one of these types, just ensure you set its slot t
 	return TRUE
 
 /obj/item/fighter_component/primary/fire(obj/structure/overmap/target)
-	var/obj/structure/overmap/fighter/F = loc
+	var/obj/structure/overmap/small_craft/F = loc
 	if(!istype(F))
 		return FALSE
 	if(!ammo.len)
@@ -1471,6 +1535,7 @@ Utility modules can be either one of these types, just ensure you set its slot t
 	var/max_ammo = 5
 	var/burst_size = 1 //Cluster torps...UNLESS?
 	var/fire_delay = 0.25 SECONDS
+	var/bypass_safety = FALSE
 
 /obj/item/fighter_component/secondary/dump_contents()
 	. = ..()
@@ -1567,7 +1632,7 @@ Utility modules can be either one of these types, just ensure you set its slot t
 	return TRUE
 
 /obj/item/fighter_component/secondary/ordnance_launcher/fire(obj/structure/overmap/target)
-	var/obj/structure/overmap/fighter/F = loc
+	var/obj/structure/overmap/small_craft/F = loc
 	if(!istype(F))
 		return FALSE
 	if(!ammo.len)
@@ -1597,189 +1662,12 @@ Utility modules can be either one of these types, just ensure you set its slot t
 /obj/item/fighter_component/primary/utility/fire(obj/structure/overmap/target)
 	return FALSE
 
-/obj/item/fighter_component/primary/utility/hold
-	name = "cargo hold"
-	desc = "A cramped cargo hold for hauling light freight."
-	icon_state = "hold_tier1"
-	var/max_w_class = WEIGHT_CLASS_GIGANTIC
-	var/max_freight = 5
-
-/obj/item/fighter_component/primary/utility/hold/tier2
-	name = "expanded cargo hold"
-	icon_state = "hold_tier2"
-	tier = 2
-	max_freight = 10
-
-/obj/item/fighter_component/primary/utility/hold/tier3
-	name = "\improper S0CC3RMUM Jumbo Sized Cargo Hold"
-	desc ="Now with extra space for seating unlucky friends in the boot!"
-	icon_state = "hold_tier3"
-	tier = 3
-	max_freight = 20
-
-/obj/item/fighter_component/primary/utility/hold/load(obj/structure/overmap/target, atom/movable/AM)
-	if(length(contents) >= max_freight || isliving(AM) || istype(AM, /obj/item/fighter_component) || istype(AM, /obj/item/card/id) || istype(AM, /obj/item/pda) || istype(AM, /obj/structure/overmap)) //This just causess issues, trust me on this)
-		return FALSE
-	if((AM.move_resist > MOVE_FORCE_DEFAULT) || !AM.doMove(src))
-		return //Can't put ultra heavy stuff in
-	target.visible_message("[icon2html(src)] [AM] is loaded into the cargo hold")
-	playsound(target, 'nsv13/sound/effects/ship/mac_load.ogg', 100, 1)
-	return TRUE
-
-/obj/item/fighter_component/primary/utility/repairer
-	name = "air-to-air repair kit"
-	desc = "A module which can use hull repair foam to repair other fighters in the air."
-	icon_state = "repairer_tier1"
-	accepted_ammo = /obj/structure/reagent_dispensers/foamtank/hull_repair_juice
-	power_usage = 50
-	fire_delay = 5 SECONDS
-	var/datum/beam/current_beam = null
-	var/next_repair = 0
-
-/obj/item/fighter_component/primary/utility/repairer/get_ammo()
-	return magazine?.reagents.total_volume
-
-/obj/item/fighter_component/primary/utility/repairer/get_max_ammo()
-	return magazine?.reagents.maximum_volume
-
-/obj/item/fighter_component/primary/utility/repairer/tier2
-	name = "upgraded air to air repair kit"
-	icon_state = "repairer_tier2"
-	tier = 2
-	fire_delay = 4 SECONDS
-
-/obj/item/fighter_component/primary/utility/repairer/tier3
-	name = "super air to air repair kit"
-	icon_state = "repairer_tier3"
-	tier = 3
-	fire_delay = 3 SECONDS
-
-/obj/item/fighter_component/primary/utility/repairer/load(obj/structure/overmap/target, atom/movable/AM)
-	if(!istype(AM, accepted_ammo))
-		return FALSE
-	magazine?.forceMove(get_turf(target))
-	if(!SSmapping.level_trait(loc.z, ZTRAIT_BOARDABLE))
-		qdel(magazine) //So bullets don't drop onto the overmap.
-	AM.forceMove(src)
-	magazine = AM
-	playsound(target, 'nsv13/sound/effects/ship/mac_load.ogg', 100, 1)
-	return TRUE
-
-/obj/item/fighter_component/primary/utility/repairer/process()
-	if(!..())
-		return FALSE
-	var/obj/structure/overmap/fighter/us = loc
-	if(!us || !istype(us) || us.fire_mode != fire_mode)
-		qdel(current_beam)
-		return FALSE
-	var/obj/structure/overmap/them = us.autofire_target
-	if(!them || !istype(them))
-		qdel(current_beam)
-		return FALSE
-	var/obj/structure/reagent_dispensers/foamtank/hull_repair_juice/tank = magazine
-	if(!tank || !istype(tank))
-		qdel(current_beam)
-		return FALSE
-	if(world.time < next_repair)
-		return FALSE
-	next_repair = world.time + fire_delay
-	new /obj/effect/temp_visual/heal(get_turf(them), COLOR_CYAN)
-	tank.reagents.remove_reagent(/datum/reagent/hull_repair_juice, 5)
-	//You can repair the main ship too! However at a painfully slow rate. Higher tiers give you vastly better repairs, and bigger ships repair smaller ships way faster.
-	them.try_repair(0.5+tier-(them.mass-us.mass))
-	//Generals sat from the lines at the back
-	us.relay('sound/items/welder.ogg')
-	them.relay('sound/items/welder2.ogg')
-	if(QDELETED(current_beam))
-		current_beam = new(us,them,beam_icon='icons/effects/beam.dmi',time=INFINITY,maxdistance = INFINITY,beam_icon_state="medbeam",btype=/obj/effect/ebeam/medical)
-		INVOKE_ASYNC(current_beam, /datum/beam.proc/Start)
-
-
 /obj/item/fighter_component/secondary/utility
 	name = "Utility Module"
 	slot = HARDPOINT_SLOT_UTILITY_SECONDARY
 	power_usage = 200
 
-/obj/item/fighter_component/secondary/utility/resupply
-	name = "air to air resupply kit"
-	desc = "A large hose line which can allow a utility craft to perform air to air refuelling and resupply, without needing to RTB!"
-	icon_state = "resupply_tier1"
-	overmap_firing_sounds = list(
-		'nsv13/sound/effects/fighters/refuel.ogg')
-	fire_delay = 6 SECONDS
-	var/datum/beam/current_beam
-	var/next_fuel = 0
-
-/obj/item/fighter_component/secondary/utility/resupply/get_ammo()
-	var/obj/structure/overmap/fighter/F = loc
-	if(!istype(F))
-		return 0
-	return F.get_fuel()
-
-/obj/item/fighter_component/secondary/utility/resupply/get_max_ammo()
-	var/obj/structure/overmap/fighter/F = loc
-	if(!istype(F))
-		return 0
-	return F.get_max_fuel()
-
-/obj/item/fighter_component/secondary/utility/resupply/tier2
-	name = "upgraded air to air resupply kit"
-	icon_state = "resupply_tier2"
-	fire_delay = 5 SECONDS
-	tier = 2
-
-/obj/item/fighter_component/secondary/utility/resupply/tier3
-	name = "super air to air resupply kit"
-	icon_state = "resupply_tier3"
-	fire_delay = 3 SECONDS
-	tier = 3
-
-/obj/item/fighter_component/secondary/utility/resupply/process()
-	if(!..())
-		return
-	var/obj/structure/overmap/fighter/F = loc
-	if((!istype(F) || !F.autofire_target || F.fire_mode != fire_mode) && current_beam)
-		QDEL_NULL(current_beam)
-		return FALSE
-	if(world.time < next_fuel)
-		return FALSE
-	var/obj/structure/overmap/fighter/them = F.autofire_target
-	if(!istype(them) || them == F) //No self targeting
-		return FALSE
-	next_fuel = world.time + fire_delay
-	if(QDELETED(current_beam))
-		current_beam = new(F,them,beam_icon='nsv13/icons/effects/beam.dmi',time=INFINITY,maxdistance = INFINITY,beam_icon_state="hose",btype=/obj/effect/ebeam/fuel_hose)
-		INVOKE_ASYNC(current_beam, /datum/beam.proc/Start)
-
-	//Firstly, try to refuel the friendly.
-	if(F.get_fuel() <= 0)
-		goto resupplyFuel
-	var/obj/item/fighter_component/fuel_tank/theirFuel = them.loadout.get_slot(HARDPOINT_SLOT_FUEL)
-	var/transfer_amount = min(50, them.get_max_fuel() - them.get_fuel()) //Transfer as much as we can
-	transfer_amount = CLAMP(transfer_amount, 0, 100)//Don't want to overfill them
-	F.relay('nsv13/sound/effects/fighters/refuel.ogg')
-	them.relay('nsv13/sound/effects/fighters/refuel.ogg')
-	var/obj/item/fighter_component/battery/B = them.loadout.get_slot(HARDPOINT_SLOT_BATTERY)
-	if(B && istype(B))
-		B.give(100) //Jumpstart their battery
-	if(transfer_amount <= 0)
-		goto resupplyFuel
-	var/obj/item/fighter_component/fuel_tank/fuel = F.loadout.get_slot(HARDPOINT_SLOT_FUEL)
-	fuel.reagents.trans_to(theirFuel, transfer_amount)
-	resupplyFuel:
-	var/obj/item/fighter_component/primary/utility/hold = F.loadout.get_slot(HARDPOINT_SLOT_UTILITY_PRIMARY)
-	if(!istype(hold))
-		return FALSE
-	var/obj/item/fighter_component/primary/theirGun = them.loadout.get_slot(HARDPOINT_SLOT_PRIMARY)
-	var/obj/item/fighter_component/primary/theirTorp = them.loadout.get_slot(HARDPOINT_SLOT_SECONDARY)
-	//Next up, try to refill the friendly's guns from whatever we have stored in cargo.
-	for(var/atom/movable/AM as() in hold.contents)
-		if(theirGun.load(them, AM))
-			continue
-		if(theirTorp.load(them, AM))
-			continue
-
-/obj/structure/overmap/fighter/proc/update_visuals()
+/obj/structure/overmap/small_craft/proc/update_visuals()
 	if(canopy)
 		cut_overlay(canopy)
 	else
@@ -1795,7 +1683,7 @@ Utility modules can be either one of these types, just ensure you set its slot t
 		return
 	add_overlay(canopy)
 
-/obj/structure/overmap/fighter/slowprocess()
+/obj/structure/overmap/small_craft/slowprocess()
 	..()
 	if(engines_active())
 		use_fuel()
@@ -1815,30 +1703,31 @@ Utility modules can be either one of these types, just ensure you set its slot t
 
 	update_visuals()
 
-/obj/structure/overmap/fighter/return_air()
+/obj/structure/overmap/small_craft/return_air()
 	var/obj/item/fighter_component/canopy/C = loadout.get_slot(HARDPOINT_SLOT_CANOPY)
 	if(canopy_open || !C || (C.obj_integrity <= 0))
 		return loc.return_air()
 	return cabin_air
 
-/obj/structure/overmap/fighter/remove_air(amount)
+/obj/structure/overmap/small_craft/remove_air(amount)
 	var/datum/gas_mixture/air = return_air()
 	return air.remove(amount)
 
-/obj/structure/overmap/fighter/return_analyzable_air()
+/obj/structure/overmap/small_craft/return_analyzable_air()
 	return cabin_air
 
-/obj/structure/overmap/fighter/return_temperature()
+/obj/structure/overmap/small_craft/return_temperature()
 	var/datum/gas_mixture/t_air = return_air()
 	return t_air.return_temperature()
 
-/obj/structure/overmap/fighter/portableConnectorReturnAir()
+/obj/structure/overmap/small_craft/portableConnectorReturnAir()
 	return return_air()
 
-/obj/structure/overmap/fighter/assume_air(datum/gas_mixture/giver)
+/obj/structure/overmap/small_craft/assume_air(datum/gas_mixture/giver)
 	var/datum/gas_mixture/t_air = return_air()
 	return t_air.merge(giver)
 
-/obj/structure/overmap/fighter/proc/toggle_canopy()
+/obj/structure/overmap/small_craft/proc/toggle_canopy()
 	canopy_open = !canopy_open
 	playsound(src, 'nsv13/sound/effects/fighters/canopy.ogg', 100, 1)
+ 

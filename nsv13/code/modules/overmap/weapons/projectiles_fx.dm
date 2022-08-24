@@ -24,7 +24,8 @@ Misc projectile types, effects, think of this as the special FX file.
 	damage = 60
 	range = 255
 	speed = 1.85
-	movement_type = FLYING | UNSTOPPABLE
+	movement_type = FLYING
+	projectile_piercing = ALL
 
 /obj/item/projectile/bullet/mac_round
 	icon = 'nsv13/icons/obj/projectiles_nsv.dmi'
@@ -40,20 +41,20 @@ Misc projectile types, effects, think of this as the special FX file.
 	impact_effect_type = /obj/effect/temp_visual/impact_effect/torpedo
 	relay_projectile_type =  /obj/item/projectile/bullet/mac_relayed_round
 	var/homing_benefit_time = 0 SECONDS //NAC shells have a very slight homing effect.
-	var/base_movement_type	//Our base move type for when we gain unstoppability from hitting tiny ships.
+	var/base_piercing_type	//Our base move type for when we gain unstoppability from hitting tiny ships.
 
-/obj/item/projectile/bullet/mac_round/prehit(atom/target)
+/obj/item/projectile/bullet/mac_round/prehit_pierce(atom/target)
 	if(isovermap(target))
 		var/obj/structure/overmap/OM = target
 		if(OM.mass <= MASS_TINY)
-			movement_type |= UNSTOPPABLE //Small things don't stop us.
+			projectile_piercing = ALL
 		else
-			movement_type = base_movement_type
+			projectile_piercing = base_piercing_type
 	. = ..()
 
 /obj/item/projectile/bullet/mac_round/Initialize()
 	. = ..()
-	base_movement_type = movement_type
+	base_piercing_type = projectile_piercing
 	if(homing_benefit_time)
 		addtimer(CALLBACK(src, .proc/stop_homing), homing_benefit_time)
 	else
@@ -66,7 +67,8 @@ Misc projectile types, effects, think of this as the special FX file.
 	damage = 250
 	armour_penetration = 70
 	icon_state = "railgun_ap"
-	movement_type = FLYING | UNSTOPPABLE //Railguns punch straight through your ship
+	movement_type = FLYING
+	projectile_piercing = ALL //Railguns punch straight through your ship
 
 /obj/item/projectile/bullet/mac_round/magneton
 	speed = 1.5
@@ -80,6 +82,12 @@ Misc projectile types, effects, think of this as the special FX file.
 	damage = 350
 	icon_state = "cannonshot"
 	flag = "overmap_medium"
+
+//You somehow loaded a magic entrapment ball into a cannon. This is your reward.
+/obj/item/projectile/bullet/mac_round/cannonshot/admin
+	damage = 600
+	speed = 3
+	flag = "overmap_heavy"
 
 #define DIRTY_SHELL_TURF_SLUDGE_PROB 70	//Chance for sludge to spawn on a turf within the sludge range of the detonation turf. Detonation turf always gets an epicenter sludge.
 #define DIRTY_SHELL_SLUDGE_RANGE 3	//Un-random sludge event radius (for the shell detonating)
@@ -100,7 +108,8 @@ Misc projectile types, effects, think of this as the special FX file.
 	name = "uh oh this isn't supposed to exist!"
 	range = 255
 	speed = 1.85
-	movement_type = FLYING | UNSTOPPABLE
+	movement_type = FLYING
+	projectile_piercing = ALL
 	damage = 45		//It's on a z now, lets not instakill people / objects this happens to hit.
 	var/penetration_fuze = 1	//Will pen through this many things considered valid for reducing this before arming. Can overpenetrate if it happens to pen through windows or other things with not enough resistance.
 
@@ -194,12 +203,12 @@ Misc projectile types, effects, think of this as the special FX file.
 /obj/item/projectile/bullet/delayed_prime/relayed_incendiary_torpedo/fuze_trigger_value(atom/target)
 	if(isclosedturf(target))
 		return 1
-	
+
 	if(isliving(target))	//Someone got bonked by an incendiary torpedo, daamn.
 		var/mob/living/L = target
 		if(L.mind && L.mind.assigned_role == "Clown")
 			return (prob(50) ? 2 : -2)	//We all know clowns are cursed.
-		return 2	
+		return 2
 
 	return 0
 
@@ -237,7 +246,7 @@ Misc projectile types, effects, think of this as the special FX file.
 		L.flash_act(affect_silicon = TRUE)
 	for(var/i = 1; i <= 13; i++)
 		new /mob/living/simple_animal/hostile/viscerator(detonation_turf)	//MANHACKS!1!!
-	
+
 
 /obj/item/projectile/bullet/railgun_slug
 	icon_state = "mac"
@@ -290,6 +299,16 @@ Misc projectile types, effects, think of this as the special FX file.
 	damage = 20
 	spread = 90
 	flag = "overmap_medium"
+	
+/obj/item/projectile/bullet/prototype_bsa
+	icon_state = "proto_bsa"
+	name = "Prototype BSA Round"
+	icon = 'nsv13/icons/obj/projectiles_nsv.dmi'
+	speed = 0.3
+	damage = 400
+	spread = 1
+	armour_penetration = 35
+	flag = "overmap_heavy"
 
 /obj/item/projectile/guided_munition
 	obj_integrity = 50
@@ -358,6 +377,11 @@ Misc projectile types, effects, think of this as the special FX file.
 	. = ..()
 	addtimer(CALLBACK(src, .proc/windup), 1 SECONDS)
 
+	var/static/list/loc_connections = list(
+		COMSIG_ATOM_ENTERED = .proc/on_entered,
+	)
+	AddElement(/datum/element/connect_loc, loc_connections)
+
 /obj/item/projectile/guided_munition/proc/windup()
 	valid_angle = 360 //Torpedoes "wind up" to hit their target
 	homing_turn_speed *= 5
@@ -424,7 +448,7 @@ Misc projectile types, effects, think of this as the special FX file.
 		target.disruption += 30
 		return
 
-	if(istype(target, /obj/structure/overmap/fighter))
+	if(istype(target, /obj/structure/overmap/small_craft))
 		target.disruption += 25
 		return
 

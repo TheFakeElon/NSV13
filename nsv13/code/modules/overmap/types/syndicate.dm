@@ -8,7 +8,7 @@
 	icon_state = "default"
 	faction = "syndicate"
 	supply_pod_type = /obj/structure/closet/supplypod/syndicate_odst
-	returns_rejected_cargo = FALSE // We won't send freight torpedoes to our enemies, we'll send actual torpedoes to our enemies 
+	returns_rejected_cargo = FALSE // We won't send freight torpedoes to our enemies, we'll send actual torpedoes to our enemies
 
 //Player Versions
 
@@ -70,6 +70,10 @@
     name = "Mako class patrol frigate (interior)"
     mappath = "_maps/templates/boarding/syndicate/mako.dmm"
 
+/datum/map_template/boarding/mako
+    name = "Mako class patrol frigate (interior)"
+    mappath = "_maps/templates/boarding/syndicate/mako.dmm"
+
 /obj/structure/overmap/syndicate/ai //Generic bad guy #10000. GRR.
 	name = "Mako class patrol frigate"
 	icon = 'nsv13/icons/overmap/new/syndicate/frigate.dmi'
@@ -89,7 +93,7 @@
 	armor = list("overmap_light" = 30, "overmap_medium" = 20, "overmap_heavy" = 30)
 	ai_flags = AI_FLAG_DESTROYER
 	combat_dice_type = /datum/combat_dice/frigate
-	possible_interior_maps = list(/datum/map_template/boarding)
+	possible_interior_maps = list(/datum/map_template/boarding/mako)
 
 
 /datum/map_template/boarding/mako_carrier
@@ -222,6 +226,10 @@
 	missiles = 10
 	bounty = 4000
 	ai_flags = AI_FLAG_BATTLESHIP | AI_FLAG_ELITE
+	
+/datum/map_template/boarding/carrier
+	name = "carrier (interior)"
+	mappath = "_maps/templates/boarding/syndicate/carrier.dmm"
 
 /obj/structure/overmap/syndicate/ai/carrier
 	name = "Syndicate combat carrier"
@@ -243,7 +251,7 @@
 	can_resupply = TRUE
 	ai_flags = AI_FLAG_SUPPLY
 	combat_dice_type = /datum/combat_dice/carrier
-	possible_interior_maps = list()
+	possible_interior_maps = list(/datum/map_template/boarding/carrier)
 
 /obj/structure/overmap/syndicate/ai/carrier/elite
 	name = "Special ops escort carrier"
@@ -258,6 +266,7 @@
 							/obj/structure/overmap/syndicate/ai/bomber)
 	ai_flags = AI_FLAG_SUPPLY | AI_FLAG_ELITE
 	combat_dice_type = /datum/combat_dice/carrier
+	possible_interior_maps = list(/datum/map_template/boarding/carrier)
 
 /obj/structure/overmap/syndicate/ai/carrier/apply_weapons()
 	weapon_types[FIRE_MODE_ANTI_AIR] = new /datum/ship_weapon/aa_guns(src)
@@ -490,6 +499,71 @@
 	weapon_types[FIRE_MODE_PDC] = new /datum/ship_weapon/pdc_mount(src)
 	weapon_types[FIRE_MODE_FLAK] = new /datum/ship_weapon/flak(src)
 	weapon_types[FIRE_MODE_MISSILE] = new /datum/ship_weapon/missile_launcher(src)
+	
+/obj/structure/overmap/hostile/ai/alicorn
+	name = "The Alicorn"
+	desc = "One Billion Lives!"
+	icon = 'nsv13/icons/overmap/alicorn.dmi'
+	icon_state = "alicorn"
+	faction = "hostile"
+	mass = MASS_LARGE
+	sprite_size = 96
+	damage_states = FALSE
+	bound_width = 112
+	bound_height = 112
+	obj_integrity = 4750
+	max_integrity = 4750
+	integrity_failure = 4750
+	cloak_factor = 100
+	shots_left = 350
+	torpedoes = 60
+	ai_controlled = TRUE
+	armor = list("overmap_light" = 99, "overmap_medium" = 70, "overmap_heavy" = 65)
+	can_resupply = TRUE
+	ai_flags = AI_FLAG_DESTROYER | AI_FLAG_ELITE
+	combat_dice_type = /datum/combat_dice/carrier
+	ai_can_launch_fighters = TRUE
+	ai_fighter_type = list(/obj/structure/overmap/hostile/ai/fighter)
+	torpedo_type = /obj/item/projectile/guided_munition/torpedo/hellfire
+	flak_battery_amount = 2
+
+/obj/structure/overmap/hostile/ai/alicorn/Initialize()
+	. = ..()
+	handle_cloak(TRUE)
+
+/obj/structure/overmap/hostile/ai/alicorn/apply_weapons()
+	weapon_types[FIRE_MODE_AMS] = new /datum/ship_weapon/vls(src)
+	weapon_types[FIRE_MODE_TORPEDO] = new /datum/ship_weapon/torpedo_launcher(src)
+	weapon_types[FIRE_MODE_GAUSS] = new /datum/ship_weapon/quadgauss(src)
+	weapon_types[FIRE_MODE_MAC] = new /datum/ship_weapon/prototype_bsa(src)
+	weapon_types[FIRE_MODE_FLAK] = new /datum/ship_weapon/flak(src)
+
+/obj/structure/overmap/hostile/ai/fighter
+	name = "Rattlesnake class fighter-bomber"
+	icon = 'nsv13/icons/overmap/alicorn.dmi'
+	icon_state = "alifighter"
+	damage_states = FALSE
+	mass = MASS_TINY
+	ai_controlled = TRUE
+	ai_behaviour = AI_AGGRESSIVE
+	weapon_safety = FALSE
+	faction = "hostile"
+	armor = list("overmap_light" = 10, "overmap_medium" = 5, "overmap_heavy" = 95)
+	obj_integrity = 115
+	max_integrity = 115 //Slightly less squishy!
+	integrity_failure = 115
+	ai_flags = AI_FLAG_SWARMER
+	bound_width = 32 
+	bound_height = 32
+	torpedoes = 1
+	missiles = 4
+	combat_dice_type = /datum/combat_dice/fighter
+	torpedo_type = /obj/item/projectile/guided_munition/torpedo/disruptor
+
+/obj/structure/overmap/hostile/ai/fighter/apply_weapons()
+	weapon_types[FIRE_MODE_ANTI_AIR] = new/datum/ship_weapon/light_cannon(src)
+	weapon_types[FIRE_MODE_MISSILE] = new/datum/ship_weapon/missile_launcher(src)
+	weapon_types[FIRE_MODE_TORPEDO] = new /datum/ship_weapon/torpedo_launcher(src)
 
 
 /obj/structure/overmap/syndicate/ai/fighter //need custom AI behaviour to escort bombers if applicable
@@ -520,6 +594,7 @@
 
 /obj/structure/overmap/syndicate/ai/bomber //need custom AI behaviour to target capitals only
 	name = "Syndicate Bomber"
+	icon = 'nsv13/icons/overmap/new/nanotrasen/fighter_overmap.dmi'
 	icon_state = "bomber_syndicate"
 	damage_states = FALSE
 	brakes = FALSE

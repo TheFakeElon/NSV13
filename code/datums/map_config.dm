@@ -5,7 +5,7 @@
 
 /datum/map_config //NSV EDITED START
 	// Metadata
-	var/config_filename = "_maps/gladius.json"
+	var/config_filename = "_maps/atlas.json"
 	var/defaulted = TRUE  // set to FALSE by LoadConfig() succeeding
 	// Config from maps.txt
 	var/config_max_users = 0
@@ -19,12 +19,13 @@
 	var/map_path = "map_files/Atlas"
 	var/map_file = list("atlas.dmm", "atlas2.dmm")
 	var/ship_type = /obj/structure/overmap/nanotrasen/battlecruiser/starter
-	var/mining_ship_type = /obj/structure/overmap/nanotrasen/mining_cruiser/rocinante
-	var/mine_disable = FALSE //NSV13 option - Allow disabling of mineship loading.
+	var/mining_ship_type = null
+	var/mine_disable = TRUE //NSV13 option - Allow disabling of mineship loading.
 	var/mine_file = "Rocinante.dmm" //Nsv13 option
 	var/mine_path = "map_files/Mining/nsv13" //NSV13 option
 	var/list/omode_blacklist = list() //NSV13 - Blacklisted overmap modes - ie remove modes
 	var/list/omode_whitelist = list() //NSV13 - Whitelisted overmap modes - ie add modes
+	var/starmap_path = "config/starmap/starmap_default.json" //NSV13 - What starmap should this map load?
 	var/mine_traits = null
 
 	var/traits = list(
@@ -180,6 +181,8 @@
 		omode_blacklist = json["omode_blacklist"]
 	if("omode_whitelist" in json) //Which extra modes we want enabled on this map
 		omode_whitelist = json["omode_whitelist"]
+	if("starmap_path" in json)
+		starmap_path = json["starmap_path"]
 
 	CHECK_EXISTS("ship_type")
 	if("ship_type" in json)

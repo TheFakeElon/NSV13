@@ -1,8 +1,11 @@
-/datum/star_system/proc/add_ship(obj/structure/overmap/OM)
+/datum/star_system/proc/add_ship(obj/structure/overmap/OM, turf/target_turf)
 	if(!system_contents.Find(OM))
 		system_contents += OM	//Lets be safe while I cast some black magic.
 	if(!occupying_z && OM.z) //Does this system have a physical existence? if not, we'll set this now so that any inbound ships jump to the same Z-level that we're on.
-		occupying_z = OM.z
+		if(OM.reserved_z)
+			occupying_z = OM.get_reserved_z()
+		else
+			occupying_z = OM.z
 		if(OM.role == MAIN_OVERMAP) //As these events all happen to the main ship, let's check that it's not say, the nomi that's triggering this system load...
 			try_spawn_event()
 		if(fleets.len)
@@ -28,7 +31,9 @@
 		return
 	var/turf/exit = get_turf(pick(orange(15, destination)))
 	OM.forceMove(exit)
-	if(istype(OM, /obj/structure/overmap))
+	if(target_turf)
+		destination = target_turf // if we launch from a ship or something, put us near that ship
+	else if(istype(OM, /obj/structure/overmap))
 		OM.current_system = src //Debugging purposes only
 	after_enter(OM)
 
@@ -37,6 +42,13 @@
 		OM.relay(null, "<span class='notice'><h2>Now entering [name]...</h2></span>")
 		OM.relay(null, "<span class='notice'>[desc]</span>")
 		//If we have an audio cue, ensure it doesn't overlap with a fleet's one...
+	//End the round upon entering O45.
+	if(CHECK_BITFIELD(system_traits, STARSYSTEM_END_ON_ENTER))
+		if(OM.role == MAIN_OVERMAP)
+			priority_announce("[station_name()] has successfully returned to [src] for resupply and crew transfer, excellent work crew.", "Naval Command")
+			GLOB.crew_transfer_risa = TRUE
+			SSticker.mode.check_finished()
+			SSticker.news_report = SHIP_VICTORY
 	if(!audio_cues?.len)
 		return FALSE
 	for(var/datum/fleet/F in fleets)
@@ -74,7 +86,7 @@
 	contents_positions = null
 	contents_positions = list()
 
-/datum/star_system/proc/remove_ship(obj/structure/overmap/OM)
+/datum/star_system/proc/remove_ship(obj/structure/overmap/OM, turf/new_location)
 	var/list/other_player_ships = list()
 	for(var/atom/X in system_contents)
 		if(istype(X, /obj/structure/overmap))
@@ -84,16 +96,16 @@
 	if(OM.reserved_z == occupying_z && other_player_ships.len) //Alright, this is our Z-level but we're jumping out of it and there are still people here.
 		var/obj/structure/overmap/ship = pick(other_player_ships)
 		message_admins("Swapping [OM] and [ship]'s reserved Zs, as they overlap.")
-		var/temp = ship.reserved_z
+		var/temp = ship.get_reserved_z()
 		ship.reserved_z = OM.reserved_z
 		OM.reserved_z = temp
-		OM.forceMove(locate(OM.x, OM.y, OM.reserved_z)) //Annnd actually kick them out of the current system.
+		OM.forceMove(new_location ? new_location : locate(OM.x, OM.y, OM.reserved_z)) //Annnd actually kick them out of the current system.
 		system_contents -= OM
 		ftl_pull_small_craft(OM)
 		return //Early return here. This means that another player ship is already holding the system, and we really don't need to double-check for this.
 
 	message_admins("Successfully removed [OM] from [src]")
-	OM.forceMove(locate(OM.x, OM.y, OM.reserved_z)) //Annnd actually kick them out of the current system.
+	OM.forceMove(new_location ? new_location : locate(OM.x, OM.y, OM.reserved_z)) //Annnd actually kick them out of the current system.
 	system_contents -= OM
 
 	if(!OM.reserved_z)	//If this isn't actually a big ship with its own interior, do not pull ships, as only those get their own reserved z.
@@ -127,9 +139,11 @@
 		if(!istype(AM, /obj/structure/overmap))
 			continue
 		var/obj/structure/overmap/OM = AM
-		if(!OM.operators.len || OM.ai_controlled)	//AI ships / ships without a pilot just get put in stasis.
+		if(OM.ai_controlled)
 			continue
-		if(same_faction_only && jumping.faction != OM.faction)	//We don't pull all small craft in the system unless we were the last ship here.
+		if(!length(OM.operators) && !length(OM.mobs_in_ship))
+			continue
+		if(same_faction_only && (jumping.faction != OM.faction)) //We don't pull all small craft in the system unless we were the last ship here.
 			continue
 		OM.relay("<span class='warning'>You're caught in [jumping]'s bluespace wake!</span>")
 		SEND_SIGNAL(OM, COMSIG_FTL_STATE_CHANGE)
@@ -220,7 +234,7 @@
 	SEND_SIGNAL(src, COMSIG_FTL_STATE_CHANGE)
 	if(role == MAIN_OVERMAP) //Scuffed please fix
 		priority_announce("Attention: All hands brace for FTL translation. Destination: [target_system]. Projected arrival time: [station_time_timestamp("hh:mm", world.time + speed MINUTES)] (Local time)","Automated announcement")
-		if(structure_crit) //Tear the ship apart if theyre trying to limp away.
+		if(structure_crit && !istype(src, /obj/structure/overmap/small_craft)) //Tear the ship apart if theyre trying to limp away.
 			for(var/i = 0, i < rand(4,8), i++)
 				var/name = pick(GLOB.teleportlocs)
 				var/area/target = GLOB.teleportlocs[name]
@@ -277,10 +291,12 @@
 	relay(ftl_drive.ftl_exit, "<span class='warning'>You feel the ship lurch to a halt</span>", loop=FALSE, channel = CHANNEL_SHIP_ALERT)
 
 	var/list/pulled = list()
-	for(var/obj/structure/overmap/SOM in GLOB.overmap_objects)
+	for(var/obj/structure/overmap/SOM in GLOB.overmap_objects) //Needs to go through global objects due to being in jumpspace not a system.
 		if(SOM.z != reserved_z)
 			continue
 		if(SOM == src)
+			continue
+		if(!SOM.z)
 			continue
 		LAZYADD(pulled, SOM)
 	target_system.add_ship(src) //Get the system to transfer us to its location.

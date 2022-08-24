@@ -309,7 +309,7 @@
 /turf/open/floor/plating,
 /area/maintenance/nsv/deck2/starboard/fore)
 "alm" = (
-/obj/structure/overmap/fighter/dropship/sabre{
+/obj/structure/overmap/small_craft/transport/sabre{
 	angle = 270
 	},
 /turf/open/floor/plating,
@@ -6325,7 +6325,7 @@
 	},
 /obj/machinery/atmospherics/components/unary/vent_scrubber/on/layer1{
 	dir = 4;
-	filter_types = list(GAS_NUCLEIUM);
+	filter_types = list("nucleium");
 	name = "Nucleium Scrubber"
 	},
 /turf/open/floor/plasteel/ridged/steel,
@@ -14460,7 +14460,7 @@
 	},
 /obj/machinery/atmospherics/components/unary/vent_scrubber/on/layer1{
 	dir = 8;
-	filter_types = list(GAS_NUCLEIUM);
+	filter_types = list("nucleium");
 	name = "Nucleium Scrubber"
 	},
 /turf/open/floor/plasteel/ridged/steel,
@@ -18494,7 +18494,7 @@
 /turf/open/floor/plasteel/techmaint,
 /area/janitor)
 "ldV" = (
-/obj/machinery/computer/ship/dradis/cargo{
+/obj/machinery/computer/ship/dradis/minor/cargo{
 	dir = 1;
 	dradis_id = "nt_cargo_torpedo_launcher"
 	},
@@ -20473,7 +20473,7 @@
 	},
 /obj/machinery/atmospherics/components/unary/vent_scrubber/on/layer1{
 	dir = 1;
-	filter_types = list(GAS_NUCLEIUM);
+	filter_types = list("nucleium");
 	name = "Nucleium Scrubber"
 	},
 /turf/open/floor/plasteel/ridged/steel,
@@ -21512,7 +21512,7 @@
 /obj/effect/turf_decal/stripes/white/line{
 	dir = 4
 	},
-/obj/item/fighter_component/secondary/utility/resupply,
+/obj/item/fighter_component/primary/utility/refuel,
 /turf/open/floor/plating,
 /area/engine/engineering/hangar)
 "mJn" = (
@@ -36523,7 +36523,7 @@
 /obj/effect/turf_decal/stripes/white/line{
 	dir = 8
 	},
-/obj/item/fighter_component/primary/utility/hold,
+/obj/item/fighter_component/secondary/utility/hold,
 /turf/open/floor/plating,
 /area/engine/engineering/hangar)
 "vpa" = (

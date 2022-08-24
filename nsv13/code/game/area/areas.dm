@@ -9,6 +9,9 @@
 /area/space
 	ambient_buzz = null
 
+/area/space/instanced
+	area_flags = HIDDEN_AREA
+
 /area/maintenance
 	ambient_buzz = 'nsv13/sound/ambience/maintenance.ogg'
 	ambientsounds = list('nsv13/sound/ambience/leit_motif.ogg','nsv13/sound/ambience/wind.ogg','nsv13/sound/ambience/wind2.ogg','nsv13/sound/ambience/wind3.ogg','nsv13/sound/ambience/wind4.ogg','nsv13/sound/ambience/wind5.ogg','nsv13/sound/ambience/wind6.ogg')
@@ -514,6 +517,10 @@
 
 /area/nsv/hanger/deck2/starboard
 	name = "Deck 2 Starboard Hanger Bay"
+	icon_state = "hallS"
+
+/area/nsv/hanger/mining
+	name = "Mining Hangar Bay"
 	icon_state = "hallS"
 
 /area/nsv/weapons

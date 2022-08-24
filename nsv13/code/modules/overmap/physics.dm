@@ -67,8 +67,11 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	var/list/collision_positions = list() //See the collisions doc for how these work. Theyre a pain in the ass.
 	var/datum/component/physics2d/physics2d = null
 
-//Helper proc to get the actual center of the ship, if the ship's hitbox is placed in the bottom left corner like they usually are.
+/// This makes us not drift like normal objects in space do
+/obj/structure/overmap/Process_Spacemove(movement_dir = 0)
+	return 1
 
+/// Helper proc to get the actual center of the ship, if the ship's hitbox is placed in the bottom left corner like they usually are.
 /obj/structure/overmap/proc/get_center()
 	RETURN_TYPE(/turf)
 	return (bound_height > 32 && bound_height > 32) ? get_turf(locate((src.x+(pixel_collision_size_x/32)/2), src.y+((pixel_collision_size_y/32)/2), z)) : get_turf(src)
@@ -122,11 +125,13 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 			handle_critical_failure_part_1()
 	disruption = max(0, disruption - 1)
 	ai_process()
+	if(!cabin_air)
+		return
 	//Atmos stuff, this updates once every tick
-	if(cabin_air && cabin_air.return_volume() > 0)
+	if(cabin_air.return_volume() > 0)
 		var/delta = cabin_air.return_temperature() - T20C
 		cabin_air.set_temperature(cabin_air.return_temperature() - max(-10, min(10, round(delta/4,0.1))))
-	if(internal_tank && cabin_air)
+	if(internal_tank)
 		var/datum/gas_mixture/tank_air = internal_tank.return_air()
 		var/cabin_pressure = cabin_air.return_pressure()
 		var/pressure_delta = min(RELEASE_PRESSURE - cabin_pressure, (tank_air.return_pressure() - cabin_pressure)/2)
@@ -138,6 +143,8 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 				cabin_air.merge(removed)
 		else if(pressure_delta < 0) //cabin pressure higher than release pressure
 			var/turf/T = get_center()
+			if(!T)
+				return
 			var/datum/gas_mixture/t_air = T.return_air()
 			pressure_delta = cabin_pressure - RELEASE_PRESSURE
 			if(t_air)
@@ -145,10 +152,7 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 			if(pressure_delta > 0) //if location pressure is lower than cabin pressure
 				transfer_moles = pressure_delta*cabin_air.return_volume()/(cabin_air.return_temperature() * R_IDEAL_GAS_EQUATION)
 				var/datum/gas_mixture/removed = cabin_air.remove(transfer_moles)
-				if(T)
-					T.assume_air(removed)
-				else //just delete the cabin gas, we're in space or some shit
-					qdel(removed)
+				T.assume_air(removed)
 
 #undef RELEASE_PRESSURE
 
@@ -162,6 +166,9 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 		slowprocess()
 	last_offset.copy(offset)
 	var/last_angle = angle
+	if(!move_by_mouse && !ai_controlled)
+		desired_angle = angle + keyboard_delta_angle_left + keyboard_delta_angle_right + movekey_delta_angle
+		movekey_delta_angle = 0
 	var/desired_angular_velocity = 0
 	if(isnum(desired_angle))
 		// do some finagling to make sure that our angles end up rotating the short way
@@ -188,7 +195,7 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	// calculate drag and shit
 
 	var/velocity_mag = velocity.ln() // magnitude
-	if(velocity_mag  && velocity_mag > 0 && !SSmapping.level_trait(src.z, ZTRAIT_OVERMAP))
+	if(velocity_mag > 0 && !SSmapping.level_trait(src.z, ZTRAIT_OVERMAP))
 		var/drag = 0
 		var/has_gravity = get_center()?.has_gravity()
 		for(var/turf/T in locs)
@@ -212,10 +219,9 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 		if(velocity_mag > 20)
 			drag = max(drag, (velocity_mag - 20) / time)
 		if(drag)
-			if(velocity_mag)
-				var/drag_factor = 1 - CLAMP(drag * time / velocity_mag, 0, 1)
-				velocity.x *= drag_factor
-				velocity.y *= drag_factor
+			var/drag_factor = 1 - CLAMP(drag * time / velocity_mag, 0, 1)
+			velocity.x *= drag_factor
+			velocity.y *= drag_factor
 			if(angular_velocity != 0)
 				var/drag_factor_spin = 1 - CLAMP(drag * 30 * time / abs(angular_velocity), 0, 1)
 				angular_velocity *= drag_factor_spin
@@ -271,7 +277,7 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 		velocity.x -= clamped_side_movement * sx
 		velocity.y -= clamped_side_movement * sy
 
-	offset._set(offset.x + velocity.x * time, offset.y +  velocity.y * time, sanity=TRUE)
+	offset._set(offset.x + velocity.x * time, offset.y +  velocity.y * time, TRUE)
 
 	position._set(x * 32 + offset.x * 32, y * 32 + offset.y * 32)
 
@@ -279,7 +285,7 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 		physics2d.update(position.x, position.y, angle)
 
 	// alright so now we reconcile the offsets with the in-world position.
-	while((offset.x > 0 && velocity.x > 0) || (offset.y > 0 && velocity.y > 0) || (offset.x < 0 && velocity.x < 0) || (offset.y < 0 && velocity.y < 0))
+	while((offset.x != 0 && velocity.x != 0) || (offset.y != 0 && velocity.y != 0))
 		var/failed_x = FALSE
 		var/failed_y = FALSE
 		if(offset.x > 0 && velocity.x > 0)
@@ -405,17 +411,14 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 			return
 		fire(autofire_target)
 
+/obj/structure/overmap/small_craft/collide(obj/structure/overmap/other, datum/collision_response/c_response, collision_velocity)
+	addtimer(VARSET_CALLBACK(src, layer, ABOVE_MOB_LAYER), 0.5 SECONDS)
+	layer = LOW_OBJ_LAYER // Stop us from just bumping right into them after we bounce
+	if(docking_act(other))
+		return
+	return ..()
+
 /obj/structure/overmap/proc/collide(obj/structure/overmap/other, datum/collision_response/c_response, collision_velocity)
-	if(layer < other.layer || other.layer > layer)
-		return FALSE
-	if(istype(other, /obj/structure/overmap/fighter))
-		var/obj/structure/overmap/fighter/F = other
-		if(F.docking_act(src))
-			return FALSE
-	if(istype(src, /obj/structure/overmap/fighter))
-		var/obj/structure/overmap/fighter/F = src
-		if(F.docking_act(other))
-			return FALSE
 	//No colliders. But we still get a lot of info anyways!
 	if(!c_response)
 		handle_cloak(CLOAK_TEMPORARY_LOSS)
@@ -565,9 +568,11 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	return ..()
 
 /obj/structure/overmap/proc/fire_projectile(proj_type, atom/target, homing = FALSE, speed=null, user_override=null, lateral=FALSE, ai_aim = FALSE, miss_chance=5, max_miss_distance=5) //Fire one shot. Used for big, hyper accelerated shots rather than PDCs
+	if(!z || QDELETED(src))
+		return FALSE
 	var/turf/T = get_center()
 	var/obj/item/projectile/proj = new proj_type(T)
-	if(ai_aim && !homing)
+	if(ai_aim && !homing && !proj.hitscan)
 		target = calculate_intercept(target, proj, miss_chance=miss_chance, max_miss_distance=max_miss_distance)
 	proj.starting = T
 	proj.firer = (!user_override && gunner) ? gunner : user_override
@@ -609,12 +614,6 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 	if(!lateral)
 		setAngle(source.angle)
 
-	if((targloc && curloc) || !params)
-		yo = targloc.y - curloc.y
-		xo = targloc.x - curloc.x
-		if(lateral)
-			setAngle(Get_Angle(src, targloc) + spread)
-
 	if(isliving(source) && params)
 		var/list/calculated = calculate_projectile_angle_and_pixel_offsets(source, params)
 		p_x = calculated[2]
@@ -626,7 +625,11 @@ This proc is to be used when someone gets stuck in an overmap ship, gauss, WHATE
 		yo = targloc.y - curloc.y
 		xo = targloc.x - curloc.x
 		if(lateral)
-			setAngle(Get_Angle(src, targloc) + spread)
+			setAngle(overmap_angle(src, targloc) + spread)
 	else
 		stack_trace("WARNING: Projectile [type] fired without either mouse parameters, or a target atom to aim at!")
 		qdel(src)
+
+/// This makes us not drift like normal objects in space do
+/obj/structure/overmap/Process_Spacemove(movement_dir = 0)
+	return 1
