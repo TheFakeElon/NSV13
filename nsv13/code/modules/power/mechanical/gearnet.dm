@@ -1,7 +1,8 @@
 /datum/gearnet
 	var/id // Unique ID
-	var/static/num = 0 // amount of gearnets that have been created
-	var/list/gears = list()
+	var/static/num = 0 // amount of gearnets that have been created since initialization.
+	var/list/gears = list() // all gears in this gearnet
+	var/version = 0 // Increments by 1 every time the gear network is updated
 
 /datum/gearnet/New()
 	num++
@@ -9,63 +10,74 @@
 	SSmechanics.gearnets += src
 
 /datum/gearnet/Destroy()
-	for(var/obj/structure/mechanical/gear/G in gears)
+	for(var/obj/structure/mechanical/gear/G as() in gears)
 		G.gearnet = null
-	gears = null
-	SSmechanics.gearnets.Remove(src)
+	SSmechanics.gearnets -= src
 	return ..()
 
-/datum/gearnet/proc/add_gear(obj/structure/mechanical/gear/G, index)
+/datum/gearnet/proc/add_gear(obj/structure/mechanical/gear/G)
 	if(G.gearnet)
 		if(G.gearnet == src)
 			return
 		else
+			// remove gear from other gearnet
 			G.gearnet.remove_gear(G)
 	G.gearnet = src
-	if(index)
-		gears[index] = G
-	else
-		gears.Add(G)
+	G.gearnet_ver = version
+	gears += G
 
 /datum/gearnet/proc/remove_gear(obj/structure/mechanical/gear/G)
-	gears.Remove(G)
+	gears -= G
 	G.gearnet = null
-	if(!gears.len)
+	if(!length(gears))
 		qdel(src)
 
-// Mostly modified gearnet code
-//remove the old gearnet and replace it with a new one throughout the network.
-/proc/propagate_gear_network(obj/O, datum/gearnet/GN)
-	var/list/worklist = list(O) //start propagating from the passed object
-	var/index = 1
-	var/obj/P = null
+// Recursively propeagate gear network through starting gear (IG)
+/datum/gearnet/proc/propagate_network(obj/structure/mechanical/gear/IG, mapload)
+	var/list/worklist = list(IG) //start propagating from the passed object
+	var/wklen = length(worklist)
+	var/obj/structure/mechanical/gear/gear
+	while(wklen)
 
-	while(index <= worklist.len) //until we've exhausted all gear objects
-		P = worklist[index] //get the next gear object found
-
-		if(istype(P, /obj/structure/mechanical/gear))
-			var/obj/structure/mechanical/gear/M = P
-			if(M.gearnet != GN) //add it to the gearnet, if it isn't already there
-				GN.add_gear(M, index)
-			worklist |= M.get_connections() //get adjacents gear objects, with or without a gearnet
-
-		index++
-/*
-		else if(M.anchored)
-			found_machines |= P
-
-		else
+		gear = worklist[wklen]
+		worklist.len--
+		if(gear.gearnet == src)
+			wklen = length(worklist)
 			continue
 
+		gear.gearnet = src
+		if(mapload)
+			gear.update_mapload_connections()
+		else
+			gear.update_connections()
+		gears += IG
+		for(var/obj/structure/mechanical/gear/CG as() in gear.connected)
+			if(CG.gearnet != src)
+				worklist += CG
+		wklen = length(worklist)
+		CHECK_TICK
 
+/datum/gearnet/proc/update_network(obj/structure/mechanical/gear/source)
+	version++
+	var/list/worklist = list()
+	// iterating because we only want the keys from the 2D list
+	for(var/obj/structure/mechanical/gear/SG as() in source.connected)
+		worklist += SG
 
-	//now that the gearnet is set, connect found machines to it
-	for(var/obj/structure/mechanical/M as() in found_machines)
-		if(!M.locate_components()) //couldn't find a node on its turf...
-			M.gearnet = null //... so disconnect if already on a gearnet
-
-*/
-
+	var/wklen = length(worklist)
+	var/obj/structure/mechanical/gear/gear
+	while(wklen)
+		gear = worklist[wklen]
+		worklist.len--
+		if(gear.gearnet_ver == version)
+			wklen = length(worklist)
+			continue
+		for(var/obj/structure/mechanical/gear/CG as() in gear.connected)
+			if(CG.gearnet_ver != version)
+				worklist += CG
+				CG.transmission_act(gear)
+		wklen = length(worklist)
+		CHECK_TICK
 
 /*
 //Merge two gearnets, the bigger (in gear length term) absorbing the other

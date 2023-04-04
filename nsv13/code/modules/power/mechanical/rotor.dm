@@ -1,5 +1,5 @@
 // -------------- MECHANICAL MOTORS -------------------
-//   --------- (Gear powering motors) --------------
+//   --------- (Gear-powering motors) --------------
 
 /obj/structure/mechanical/gear/powered
 	name = null

@@ -25,7 +25,7 @@
 		if("input")
 			if(automode)
 				return
-			var/obj/structure/mechanical/power/motor/vroom = motors[target]
+			var/obj/structure/mechanical/powered/motor/vroom = motors[target]
 			if(!vroom)
 				return
 			var/input = clamp(text2num(params["desired_man"]), 0, vroom.capacity)
@@ -53,7 +53,7 @@
 /obj/machinery/computer/flymotor/process()
 	if(!automode || (stat & BROKEN) || !motors.len || !flywheel)
 		return
-	for(var/obj/structure/mechanical/power/motor/MO in motors)
+	for(var/obj/structure/mechanical/powered/motor/MO in motors)
 		if(MO.is_satisfied())
 			return
 		MO.current_amt = clamp(auto_remaining(), 0, MO.capacity)

@@ -1,13 +1,13 @@
 /// Checks if the selected mechanical part is touching us, only works for connections along the same axis. Do not use after mapload
 #define is_connected_cardinal(M) (loc == M.loc || ((x == M.x || y == M.y) && get_dist(src, M) == radius + M.radius))
 /*
- * Uses rounding because irrational figures.
- * Ideally we'd use truncation instead but we don't have that yet because byond
+ * Uses a broader equivalency because irrational figures + floating point numbers is not fun.
+ * Ideally we'd use truncation instead but we don't have that yet because byond.
  * This technically means that *massive* gears may fail to connect but that shouldn't matter outside of extreme adminbus
  * This gets called a lot in loops so it's a define to reduce overhead
 */
 /// Checks if the selected mechanical part is touching us, accounts for diagonal connections. All post-mapload connection checks should use this. Expensive.
-#define is_connected_euclidian(M) (loc == M.loc || round(sqrt((x - M.x)*(x - M.x) + (y - M.y)*(y - M.y)), 0.01) == round(radius + M.radius, 0.01))
+#define is_connected_euclidian(M) (loc == M.loc || ISEQUIVALENT(sqrt((x - M.x)*(x - M.x) + (y - M.y)*(y - M.y)), (radius + M.radius), 0.01))
 
 
 /obj/structure/mechanical
@@ -63,69 +63,64 @@
 	desc = "A basic gear used to transfer rotary motion between objects."
 	icon_state = "cog1"
 	radius = 0.5
-//	var/datum/gearnet/gearnet
-	var/list/connected = list() // adjacent connected gears
-//	var/geartype = GT_NORMAL
-
-//	var/gear_ratio = (rotor_radius * 2 * PI) / (flywheel.radius * 2 * PI)
+	var/datum/gearnet/gearnet
+	var/gearnet_ver = 0
+	// A 2D list of every gear connected to us and our relative gear ratio
+	// Should only be added to via connect()
+	var/list/connected = list()
 
 /obj/structure/mechanical/gear/Initialize(mapload)
 	. = ..()
-	propagate_connections(mapload)
+	// we handle mapload connections in SSMechanics
+	if(!mapload)
+		update_connections()
+		SSmechanics.get_gearnet(src)
 
 /obj/structure/mechanical/gear/Destroy()
 	for(var/obj/structure/mechanical/gear/G in connected)
 		G.connected -= src
 	connected = null
+	gearnet?.remove_gear(src)
 	return ..()
 
 /obj/structure/mechanical/gear/Moved(atom/OldLoc, Dir)
 	. = ..()
 	propagate_connections()
 
-/obj/structure/mechanical/gear/proc/get_mapload_connections()
-	connected.len = 0
+// setup connection with another gear
+/obj/structure/mechanical/gear/proc/connect(obj/structure/mechanical/gear/OG)
+	connected[OG] = OG.radius / radius
+
+// Get connected gears, should only be used during mapload, explanation can be found below.
+/obj/structure/mechanical/gear/proc/update_mapload_connections()
 	for(var/obj/structure/mechanical/gear/G in GLOB.mechanical)
 		if(G == src)
 			continue
 		if(is_connected_cardinal(G))
-			connected += G
+			connect(G)
 
-/*	Unlike get_mapload_connections, get_connections has to be a catch all as any gear needs to capable of finding it's connected gears on it's own.
+/*
+*	Unlike update_mapload_connections, update_connections has to be a catch all as any gear needs to capable of finding it's connected gears on it's own.
 *	For example, we only need to use euclidian distance for large gears on mapload because they can modfy the smaller gear's connected list to include themselves (large gear) for them (small gear)
 *	However; after mapload, a newly placed small gear wouldn't be able to determine it's connected to a large gear without using euclidian distance
-*	So we use seperate the procs, get_connnections() for non-dependent checks post mapload and get_mapload_connections() for more performant checks when large/euclidian checking
+*	So we use seperate the procs, get_connnections() for non-dependent checks post mapload and update_mapload_connections() for more performant checks when large/euclidian checking
 *	gears will help
 */
-/obj/structure/mechanical/gear/proc/get_connections()
+/obj/structure/mechanical/gear/proc/update_connections()
 	connected.len = 0
 	for(var/obj/structure/mechanical/gear/G in GLOB.mechanical)
 		if(G == src)
 			continue
 		if(is_connected_euclidian(G)) // the only difference between mapload
-			connected += G
-
-/obj/structure/mechanical/gear/proc/propagate_connections(mapload)
-	if(mapload)
-		get_mapload_connections()
-	else
-		get_connections()
-	for(var/obj/structure/mechanical/gear/G in connected)
-		if(src in G.connected)
-			continue
-		G.propagate_connections(mapload)
+			connect(G)
 
 /*
- * Initial call is usually made in transmission_process(). calls recursively through the gear network
- * passes a list of already called gears
+ * Called by gearnets, handles change in the network.
 */
-/obj/structure/mechanical/gear/proc/transmission_act(obj/structure/mechanical/gear/caller, list/called = list())
+/obj/structure/mechanical/gear/proc/transmission_act(obj/structure/mechanical/gear/caller)
 	var/Gratio = caller.radius / radius
 	rpm = -caller.rpm * Gratio
 	torque = caller.torque / Gratio
-	called += src
-	for(var/obj/structure/mechanical/gear/G in connected - called)
-		G.transmission_act(src, called)
 	if(rpm)
 		update_animation()
 	else
@@ -147,14 +142,13 @@
 	radius = 0.914 // 1 tile diagonal distance (sqrt(2)) - gear radius (0.5) gets you 0.914 after rounding, the radius required for a diagonal connection with a small gear from 1 tile away
 
 // only large gears handle need to get diagonal connections on mapload
-/obj/structure/mechanical/gear/large/get_mapload_connections()
-	connected.len = 0
+/obj/structure/mechanical/gear/large/update_mapload_connections()
 	for(var/obj/structure/mechanical/gear/G in GLOB.mechanical)
 		if(G == src)
 			continue
 		if(is_connected_euclidian(G))
-			connected += G
-			G.connected |= src
+			connect(G)
+			G.connect(src)
 
 // Shaftbox
 
@@ -165,7 +159,7 @@
 	var/obj/structure/mechanical/shaftbox
 
 // Should face towards connected shaftbox
-/obj/structure/mechanical/gear/shaftbox_gear/get_connections()
+/obj/structure/mechanical/gear/shaftbox_gear/update_connections()
 	..()
 	var/rel_dir
 	// We can't connect to normal gears on the gearbox side
