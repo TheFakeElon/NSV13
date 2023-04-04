@@ -22,17 +22,13 @@
 	var/wrr = 1 // pitch
 
 /datum/looping_sound/flywheel/play(soundfile)
-	var/list/atoms_cache = output_atoms
 	var/sound/S = sound(soundfile)
 	if(direct)
 		S.channel = SSsounds.random_available_channel()
 		S.volume = volume
-	for(var/i in 1 to atoms_cache.len)
-		var/atom/thing = atoms_cache[i]
-		if(direct)
-			SEND_SOUND(thing, S)
-		else
-			playsound(thing, S, volume, wrr, extra_range, wrr)
+		SEND_SOUND(parent, S)
+	else
+		playsound(parent, S, volume, wrr, extra_range, frequnecy=wrr)
 
 /datum/looping_sound/flywheel/proc/update_wrr(rpm, max_rpm)
 	wrr = BASE_FREQ + rpm / max_rpm

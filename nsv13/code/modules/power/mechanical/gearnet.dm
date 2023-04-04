@@ -45,12 +45,12 @@
 			wklen = length(worklist)
 			continue
 
-		gear.gearnet = src
+		add_gear(gear)
 		if(mapload)
 			gear.update_mapload_connections()
 		else
 			gear.update_connections()
-		gears += IG
+
 		for(var/obj/structure/mechanical/gear/CG as() in gear.connected)
 			if(CG.gearnet != src)
 				worklist += CG

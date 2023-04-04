@@ -12,7 +12,7 @@
 
 /obj/structure/mechanical
 	name = null
-	icon = 'austation/icons/obj/machinery/mechanical.dmi'
+	icon = 'nsv13/icons/obj/machinery/mechanical.dmi'
 	anchored = TRUE
 	density = TRUE
 	obj_flags = CAN_BE_HIT | ON_BLUEPRINTS
@@ -85,7 +85,12 @@
 
 /obj/structure/mechanical/gear/Moved(atom/OldLoc, Dir)
 	. = ..()
-	propagate_connections()
+	if(OldLoc == loc) // I don't *think* this can happen but just in case
+		return
+	for(var/obj/structure/mechanical/gear/G as() in connected)
+		G.connected -= src
+	update_connections()
+	SSmechanics.get_gearnet(src)
 
 // setup connection with another gear
 /obj/structure/mechanical/gear/proc/connect(obj/structure/mechanical/gear/OG)
