@@ -4,7 +4,7 @@
 
 /// A more sophisticated version of looping sounds that give you much more dynamic control over the sounds you are playing. It's a tad more expensive so only use it when you need it
 /datum/looping_sound/advanced
-	var/channel // Keep in mind most advanced procs will not work without a designated channel
+	var/channel // Keep in mind most advanced sounds will not work without a designated channel
 	var/can_process = FALSE
 	// Associated list, each output atom contains a list of listeners and each listener contains their coordinates.
 	// Structure:  output_atom = list( L1 = list(L1.x, L1.y), L2 = list(L2.x, L2.y), etc )
