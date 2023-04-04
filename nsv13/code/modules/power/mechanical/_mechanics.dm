@@ -1,7 +1,7 @@
 /// Checks if the selected mechanical part is touching us, only works for connections along the same axis. Do not use after mapload
 #define is_connected_cardinal(M) (loc == M.loc || ((x == M.x || y == M.y) && get_dist(src, M) == radius + M.radius))
 /*
- * Uses rounding because euclidian distance has more irrational figures than the entirey of unitystation's dev team.
+ * Uses rounding because irrational figures.
  * Ideally we'd use truncation instead but we don't have that yet because byond
  * This technically means that *massive* gears may fail to connect but that shouldn't matter outside of extreme adminbus
  * This gets called a lot in loops so it's a define to reduce overhead
@@ -174,6 +174,3 @@
 		if(rel_dir & dir)
 			connected  -= G
 	shaftbox = locate() in get_step(src, dir)
-
-
-
