@@ -162,6 +162,12 @@
 	var/obj/structure/mechanical/gear/shaftbox_adapter/adapter
 	var/list/transmission_shafts = list() // list of all the transmission shaft pieces
 	var/last_assigned_icon // the last icon state we assigned to our transmission shafts
+	var/last_rotate_dir = 0 // last rotation direction (relative). -1 for clockwise, 0 for none, 1 for clockwise
+	var/connects // bitfield of valid shaft piece directions
+
+/obj/structure/mechanical/gear/shaftbox/Initialize()
+	. = ..()
+	update_connects()
 
 /obj/structure/mechanical/gear/shaftbox/LateInitialize()
 	..()
@@ -175,10 +181,12 @@
 /obj/structure/mechanical/gear/shaftbox/locate_components()
 	if(length(transmission_shafts))
 		clear_shaftpieces()
+	if(!(dir & connects))
+		update_connects()
 	var/turf/NT = get_step(OT, dir)
-	var/obj/effect/shaftpiece/SP = locate() in NT
+	var/obj/structure/shaftpiece/SP = locate() in NT
 	while(SP)
-		if(QDELING(SP))
+		if(QDELING(SP) || !(SP.dir & connects))
 			SP = null
 			continue
 		add_shaftpiece(SP)
@@ -194,17 +202,25 @@
 		return
 	var/nicon
 	if(rpm)
-		// Which icon state number to use. Changes are more noticable at low speeds so I've made the relationship non-linear
-		// Unfortunately we're stuck with this until the day BYOND lets us change icon animation speed at runtime
-		var/iconstate_index = clamp(floor(0.5 * sqrt(abs(rpm))), 1, 8)
-		nicon = "shaft_[iconstate_index]"
+		if(rpm > max_rpm * 0.75)
+			nicon = "shaft_wobble"
+		else
+			// Which icon state number to use. Changes are more noticable at low speeds so I've made the relationship non-linear
+			// Unfortunately we're stuck with this until the day BYOND lets us change icon animation speed at runtime
+			var/iconstate_index = clamp(floor(0.5 * sqrt(abs(rpm))), 1, 8)
+			nicon = "shaft_[iconstate_index]"
 	else
 		nicon = "shaft_idle"
+	var/rotate_dir = SIGN(rpm)
+	if(rotate_dir != last_rotate_dir)
+		for(var/obj/structure/shaftpiece/SP as() in transmission_shafts)
+			SP.icon_state = nicon
+			SP.dir = turn(SP.dir, 180)
 	if(nicon == last_assigned_icon)
 		return
-	for(var/obj/effect/shaftpiece/SP as() in transmission_shafts)
+	for(var/obj/structure/shaftpiece/SP as() in transmission_shafts)
 		SP.icon_state = nicon
-		last_assigned_icon = nicon
+	last_assigned_icon = nicon
 
 /obj/structure/mechanical/gear/shaftbox/proc/add_shaftpiece(obj/effect/shaftpiece/SP)
 	RegisterSignal(SP, list(COMSIG_MOVABLE_MOVED, COMSIG_PARENT_QDELETING), .proc/remove_shaftpiece)
@@ -216,18 +232,24 @@
 	locate_components()
 
 /obj/structure/mechanical/gear/shaftbox/proc/clear_shaftpieces()
-	for(var/obj/effect/shaftpiece/SP as() in transmission_shafts)
+	for(var/obj/structure/shaftpiece/SP as() in transmission_shafts)
 		UnregisterSignal(SP, list(COMSIG_MOVABLE_MOVED, COMSIG_PARENT_QDELETING))
 		SP.icon_state = "shaft_idle"
 	transmission_shafts.len = 0
 
+/obj/structure/mechanical/gear/shaftbox/proc/update_connects()
+	if(dir & (NORTH|SOUTH))
+		connects = NORTH | SOUTH
+	else
+		connects = EAST | WEST
 
 
-/obj/effect/shaftpiece
+/obj/structure/shaftpiece
 	name = "transmission shaft"
 	desc = "Moves kinetic energy along a linear axis."
-	icon = 'nsv13/icons/obj/machinery/mechanical.dmi'
+	icon = 'nsv13/icons/obj/machinery/shaft.dmi'
 	icon_state = "shaft_idle"
+	layer = ABOVE_OBJ_LAYER
 
 
 // The bevel adapter between normal gears and the shaft gear box.
