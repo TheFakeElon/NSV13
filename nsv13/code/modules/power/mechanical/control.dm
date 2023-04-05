@@ -51,7 +51,7 @@
 
 // for handling auto
 /obj/machinery/computer/flymotor/process()
-	if(!automode || (stat & BROKEN) || !motors.len || !flywheel)
+	if(!automode || (stat & BROKEN) || !length(motors) || !flywheel)
 		return
 	for(var/obj/structure/mechanical/powered/motor/MO in motors)
 		if(MO.is_satisfied())

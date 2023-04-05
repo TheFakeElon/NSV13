@@ -11,7 +11,6 @@
 /datum/looping_sound/advanced/ftl_drive/process()
 	recalculate_volume(1)
 
-#define BASE_FREQ 0.4
 
 /datum/looping_sound/flywheel
 	start_sound = 'nsv13/sound/effects/flywheel/startup.ogg'
@@ -19,7 +18,12 @@
 	volume = 50
 	end_sound = 'nsv13/sound/effects/flywheel/shutdown.ogg'
 	extra_range = 6
-	var/wrr = 1 // pitch
+	var/base_freq = 0.4 // base pitch multiplier
+	var/wrr // current pitch multiplier, initialized to base_freq
+
+/datum/looping_sound/flywheel/New()
+	wrr = base_freq
+	..()
 
 /datum/looping_sound/flywheel/play(soundfile)
 	var/sound/S = sound(soundfile)
@@ -28,9 +32,8 @@
 		S.volume = volume
 		SEND_SOUND(parent, S)
 	else
-		playsound(parent, S, volume, wrr, extra_range, frequnecy=wrr)
+		playsound(parent, S, volume, wrr, extra_range, frequency=wrr)
 
 /datum/looping_sound/flywheel/proc/update_wrr(rpm, max_rpm)
-	wrr = BASE_FREQ + rpm / max_rpm
+	wrr = base_freq + rpm / max_rpm
 
-#undef BASE_FREQ

@@ -1,2 +1,2 @@
-/// List of all mechanical objects
-GLOBAL_LIST_EMPTY(mechanical)
+/// List of all mechanical gears
+GLOBAL_LIST_EMPTY(gears)

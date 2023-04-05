@@ -9,20 +9,18 @@ SUBSYSTEM_DEF(mechanics)
 	var/list/currentrun = list()
 	var/list/gearnets = list()
 
-/datum/controller/subsystem/mechanics/Initialize()
+/datum/controller/subsystem/mechanics/Initialize(start_timeofday)
 	Initialize_gearnets()
 	fire()
 	return ..()
 
 /datum/controller/subsystem/mechanics/proc/Initialize_gearnets()
-	for(var/datum/gearnet/GN in gearnets)
-		qdel(GN)
+	QDEL_LIST(gearnets)
 	gearnets.len = 0
-	var/mapload = SSatoms.initialized != INITIALIZATION_INNEW_REGULAR
-	for(var/obj/structure/mechanical/gear/M in GLOB.mechanical)
+	for(var/obj/structure/mechanical/gear/M in GLOB.gears)
 		if(!M.gearnet) // If it's been hit by a propagation it'll have a gearnet
 			var/datum/gearnet/newGN = new()
-			newGN.propagate_network(M, mapload)
+			newGN.propagate_network(M, TRUE)
 
 /datum/controller/subsystem/mechanics/stat_entry()
 	return ..("CR:[length(currentrun)]|GN:[length(gearnets)]")
@@ -59,7 +57,8 @@ SUBSYSTEM_DEF(mechanics)
 		return
 	var/list/found_gearnets = list()
 	for(var/obj/structure/mechanical/gear/CG as() in GR.connected)
-		found_gearnets |= CG.gearnet
+		if(CG.gearnet)
+			found_gearnets |= CG.gearnet
 	// if we found no gearnets in our connections, build one ourselves
 	if(!length(found_gearnets))
 		newGN = new()

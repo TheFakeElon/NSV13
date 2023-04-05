@@ -134,8 +134,8 @@
 #define INIT_ORDER_NETWORKS			45
 #define INIT_ORDER_ECONOMY			40
 #define INIT_ORDER_OUTPUTS			35
+#define INIT_ORDER_MECHANICS		32 // NSV13 -- Needs to init after atoms
 #define INIT_ORDER_ATOMS			30
-#define INIT_ORDER_MECHANICS		27 // NSV13 -- Needs to init before atoms
 #define INIT_ORDER_LANGUAGE			25
 #define INIT_ORDER_MACHINES			20
 #define INIT_ORDER_CIRCUIT			15

@@ -27,8 +27,6 @@
 
 /obj/structure/mechanical/Initialize()
 	. = ..()
-	GLOB.mechanical += src
-
 	// could possibly break something in the future idk lol
 	// radius * 64 == radius * 2 * 32
 	bound_width = round(radius * 64, 32)
@@ -52,10 +50,6 @@
 	visible_message("<span class='alert'>\The [src] breaks under the stress!</span>")
 	qdel(src)
 
-/obj/structure/mechanical/Destroy()
-	GLOB.mechanical -= src
-	return ..()
-
 
 // Basic gear
 /obj/structure/mechanical/gear
@@ -71,12 +65,14 @@
 
 /obj/structure/mechanical/gear/Initialize(mapload)
 	. = ..()
-	// we handle mapload connections in SSMechanics
-	if(!mapload)
+	GLOB.gears += src
+	// we handle initial mapload connections in SSMechanics
+	if(SSmechanics.initialized)
 		update_connections()
 		SSmechanics.get_gearnet(src)
 
 /obj/structure/mechanical/gear/Destroy()
+	GLOB.gears -= src
 	for(var/obj/structure/mechanical/gear/G in connected)
 		G.connected -= src
 	connected = null
@@ -98,7 +94,7 @@
 
 // Get connected gears, should only be used during mapload, explanation can be found below.
 /obj/structure/mechanical/gear/proc/update_mapload_connections()
-	for(var/obj/structure/mechanical/gear/G in GLOB.mechanical)
+	for(var/obj/structure/mechanical/gear/G in GLOB.gears)
 		if(G == src)
 			continue
 		if(is_connected_cardinal(G))
@@ -113,7 +109,7 @@
 */
 /obj/structure/mechanical/gear/proc/update_connections()
 	connected.len = 0
-	for(var/obj/structure/mechanical/gear/G in GLOB.mechanical)
+	for(var/obj/structure/mechanical/gear/G in GLOB.gears)
 		if(G == src)
 			continue
 		if(is_connected_euclidian(G)) // the only difference between mapload
@@ -126,19 +122,17 @@
 	var/Gratio = caller.radius / radius
 	rpm = -caller.rpm * Gratio
 	torque = caller.torque / Gratio
-	if(rpm)
-		update_animation()
-	else
-		animate(src)
+	update_animation()
 
 /obj/structure/mechanical/gear/proc/update_animation()
 	animate(src)
-	SpinAnimation(600 / abs(rpm), -1, rpm > 0, 3, FALSE)
+	if(rpm)
+		SpinAnimation(600 / abs(rpm), -1, rpm > 0, 3, FALSE)
 
 /obj/structure/mechanical/gear/vv_edit_var(var_name, var_value)
 	. = ..()
 	if(. && (var_name == NAMEOF(src, rpm) || var_name == NAMEOF(src, torque))) // don't do this admins. You will probably break something
-		transmission_act(src) // I'm stll mad you did it >:(
+		update_animation() // I'm stll mad you did it >:(
 
 /obj/structure/mechanical/gear/large
 	name = "large plasteel gear"
@@ -148,7 +142,7 @@
 
 // only large gears handle need to get diagonal connections on mapload
 /obj/structure/mechanical/gear/large/update_mapload_connections()
-	for(var/obj/structure/mechanical/gear/G in GLOB.mechanical)
+	for(var/obj/structure/mechanical/gear/G in GLOB.gears)
 		if(G == src)
 			continue
 		if(is_connected_euclidian(G))
@@ -158,7 +152,7 @@
 // Shaftbox
 
 /obj/structure/mechanical/gear/shaftbox_gear
-	name = "shaftbox gear"
+	name = "shaft gear adapter"
 	desc = "A gear that transfers energy to and from a shaft box."
 	icon_state = "shaftbox"
 	var/obj/structure/mechanical/shaftbox
@@ -173,3 +167,8 @@
 		if(rel_dir & dir)
 			connected  -= G
 	shaftbox = locate() in get_step(src, dir)
+
+
+/obj/structure/mechanical/shaftbox
+	name = "shaft gearbox"
+	desc = "A gear box"
