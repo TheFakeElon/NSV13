@@ -63,9 +63,12 @@
 	// Should only be added to via connect()
 	var/list/connected = list()
 
-/obj/structure/mechanical/gear/Initialize(mapload)
-	. = ..()
+/obj/structure/mechanical/gear/Initialize()
+	..()
 	GLOB.gears += src
+	return INITIALIZE_HINT_LATELOAD
+
+/obj/structure/mechanical/gear/LateInitialize()
 	// we handle initial mapload connections in SSMechanics
 	if(SSmechanics.initialized)
 		update_connections()
@@ -151,14 +154,97 @@
 
 // Shaftbox
 
-/obj/structure/mechanical/gear/shaftbox_gear
-	name = "shaft gear adapter"
-	desc = "A gear that transfers energy to and from a shaft box."
-	icon_state = "shaftbox"
-	var/obj/structure/mechanical/shaftbox
 
-// Should face towards connected shaftbox
-/obj/structure/mechanical/gear/shaftbox_gear/update_connections()
+
+/obj/structure/mechanical/gear/shaftbox
+	name = "shaft gearbox"
+	desc = "A gear box that acts as a bridge between a transmission shaft and a gear network"
+	var/obj/structure/mechanical/gear/shaftbox_adapter/adapter
+	var/list/transmission_shafts = list() // list of all the transmission shaft pieces
+	var/last_assigned_icon // the last icon state we assigned to our transmission shafts
+
+/obj/structure/mechanical/gear/shaftbox/LateInitialize()
+	..()
+	adapter = new(loc)
+	radius = adapter.radius // 1:1
+
+/obj/structure/mechanical/gear/shaftbox/update_connections()
+	connections = list(adapter)
+	locate_components()
+
+/obj/structure/mechanical/gear/shaftbox/locate_components()
+	if(length(transmission_shafts))
+		clear_shaftpieces()
+	var/turf/NT = get_step(OT, dir)
+	var/obj/effect/shaftpiece/SP = locate() in NT
+	while(SP)
+		if(QDELING(SP))
+			SP = null
+			continue
+		add_shaftpiece(SP)
+		NT = get_step(NT, dir)
+		SP = locate() in NT
+	// check for a shaftbox at the end of the transmission shaft
+	var/obj/structure/mechanical/gear/shaftbox/connected_shaftbox = locate() in NT
+	if(connected_shaftbox)
+		connected += connected_shaftbox
+
+/obj/structure/mechanical/gear/shaftbox/update_animation()
+	if(!length(transmission_shafts))
+		return
+	var/nicon
+	if(rpm)
+		// Which icon state number to use. Changes are more noticable at low speeds so I've made the relationship non-linear
+		// Unfortunately we're stuck with this until the day BYOND lets us change icon animation speed at runtime
+		var/iconstate_index = clamp(floor(0.5 * sqrt(abs(rpm))), 1, 8)
+		nicon = "shaft_[iconstate_index]"
+	else
+		nicon = "shaft_idle"
+	if(nicon == last_assigned_icon)
+		return
+	for(var/obj/effect/shaftpiece/SP as() in transmission_shafts)
+		SP.icon_state = nicon
+		last_assigned_icon = nicon
+
+/obj/structure/mechanical/gear/shaftbox/proc/add_shaftpiece(obj/effect/shaftpiece/SP)
+	RegisterSignal(SP, list(COMSIG_MOVABLE_MOVED, COMSIG_PARENT_QDELETING), .proc/remove_shaftpiece)
+	transmission_shafts += SP
+
+/obj/structure/mechanical/gear/shaftbox/proc/remove_shaftpiece(obj/effect/shaftpiece/SP)
+	SIGNAL_HANDLER
+	UnregisterSignal(SP, list(COMSIG_MOVABLE_MOVED, COMSIG_PARENT_QDELETING))
+	locate_components()
+
+/obj/structure/mechanical/gear/shaftbox/proc/clear_shaftpieces()
+	for(var/obj/effect/shaftpiece/SP as() in transmission_shafts)
+		UnregisterSignal(SP, list(COMSIG_MOVABLE_MOVED, COMSIG_PARENT_QDELETING))
+		SP.icon_state = "shaft_idle"
+	transmission_shafts.len = 0
+
+
+
+/obj/effect/shaftpiece
+	name = "transmission shaft"
+	desc = "Moves kinetic energy along a linear axis."
+	icon = 'nsv13/icons/obj/machinery/mechanical.dmi'
+	icon_state = "shaft_idle"
+
+
+// The bevel adapter between normal gears and the shaft gear box.
+// Created by the shaft gearbox on spawn.
+/obj/structure/mechanical/gear/shaftbox_adapter
+	name = "gear adapter"
+	desc = "An adapter that connects gearwheels to the shaft gearbox"
+	var/obj/structure/mechanical/gear/shaftbox/shaftbox
+
+/obj/structure/mechanical/gear/shaftbox/LateInitialize()
+	shaftbox = locate() in loc
+	if(!shaftbox)
+		qdel(src)
+		return
+	..()
+
+/obj/structure/mechanical/gear/shaftbox_adapter/update_connections()
 	..()
 	var/rel_dir
 	// We can't connect to normal gears on the gearbox side
@@ -166,9 +252,8 @@
 		rel_dir = get_dir(src, G)
 		if(rel_dir & dir)
 			connected  -= G
-	shaftbox = locate() in get_step(src, dir)
-
-
-/obj/structure/mechanical/shaftbox
-	name = "shaft gearbox"
-	desc = "A gear box"
+	shaftbox = locate() in loc
+	if(!shaftbox)
+		qdel(src)
+		return
+	connect(shaftbox)
