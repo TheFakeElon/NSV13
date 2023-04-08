@@ -28,7 +28,7 @@
 		current_power = 0
 		return
 	while(current_power > cable.delayed_surplus())
-		current_power -= clamp(round(current_power * 0.25), 5000, current_power)
+		current_power -= min(round(current_power * 0.25), 5000, current_power)
 	cable.add_delayedload(current_power)
 
 /obj/structure/mechanical/gear/powered/motor
@@ -38,17 +38,16 @@
 	radius = 0.5
 
 /obj/structure/mechanical/gear/powered/motor/process()
+	..()
 	if(last_power == current_power && last_rpm == rpm)
 		return
 	torque = CALC_TORQUE(current_power * efficiency, rpm)
-	for(var/obj/structure/mechanical/gear/G in connected)
-		G.transmission_act(src, list(src))
-
+	SSmechanics.queue_update(src)
 	last_power = current_power
 	last_rpm = rpm
 
 // unsynchronized motors will break
-/obj/structure/mechanical/gear/powered/motor/transmission_act(obj/structure/mechanical/gear/caller, list/called)
+/obj/structure/mechanical/gear/powered/motor/transmission_act(obj/structure/mechanical/gear/caller)
 	if(torque * rpm != caller.torque * caller.rpm)
 		overstress(caller)
 	else

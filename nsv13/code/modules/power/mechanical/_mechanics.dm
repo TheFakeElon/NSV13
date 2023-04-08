@@ -85,9 +85,15 @@
 	update_connections()
 	SSmechanics.get_gearnet(src)
 
+// called by gear wanting to connect after spatial connection check has passed.
+// override if a gear has any special connection requirements.
+/obj/structure/mechanical/gear/proc/can_connect(obj/structure/mechanical/gear/OG)
+	return TRUE
+
 // setup connection with another gear
 /obj/structure/mechanical/gear/proc/connect(obj/structure/mechanical/gear/OG)
-	connected[OG] = OG.radius / radius
+	if(OG.can_connect(src))
+		connected[OG] = OG.radius / radius
 
 // Get connected gears, should only be used during mapload, explanation can be found below.
 /obj/structure/mechanical/gear/proc/update_mapload_connections()

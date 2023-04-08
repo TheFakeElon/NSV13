@@ -67,7 +67,7 @@ SUBSYSTEM_DEF(mechanics)
 	// if we only found one gearnet, join it
 	if(length(found_gearnets) == 1)
 		newGN = found_gearnets[1]
-		newGN.add_gear(src)
+		newGN.add_gear(GR)
 	else // if we found multiple, we gotta do some reconstruction and join two together
 		newGN = join_gearnets(found_gearnets)
 		newGN.add_gear(GR)
