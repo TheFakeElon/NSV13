@@ -7,6 +7,7 @@
 /obj/structure/mechanical/gear/shaftbox
 	name = "shaft gearbox"
 	desc = "A gear box that acts as a bridge between a transmission shaft and a gear network"
+	icon_state = "shaftbox"
 	var/obj/structure/mechanical/gear/shaftbox_adapter/adapter
 	var/list/transmission_shafts = list() // list of all the transmission shaft pieces
 	var/last_assigned_icon // the last icon state we assigned to our transmission shafts
@@ -61,12 +62,12 @@
 			nicon = "shaft_[iconstate_index]"
 	else
 		nicon = "shaft_idle"
-		rotate_dir = 0
+		rotate_dir = SHAFT_ROTATE_NONE
 	// if we've inverted our rotation direction, we need to flip all of the shaft icons.
 	// we'll update the icon state while we're at it
-	if(rotate_dir != last_rotate_dir && rotate_dir != 0)
+	if(rotate_dir != last_rotate_dir && rotate_dir != SHAFT_ROTATE_NONE)
 		var/new_shaft_dir
-		if(rotate_dir == 1)
+		if(rotate_dir == SHAFT_ROTATE_CLOCKWISE)
 			new_shaft_dir = dir
 		else
 			new_shaft_dir = turn(dir, 180)
@@ -81,11 +82,11 @@
 			SP.icon_state = nicon
 		last_assigned_icon = nicon
 
-/obj/structure/mechanical/gear/shaftbox/proc/add_shaftpiece(obj/effect/shaftpiece/SP)
+/obj/structure/mechanical/gear/shaftbox/proc/add_shaftpiece(obj/structure/shaftpiece/SP)
 	RegisterSignal(SP, list(COMSIG_MOVABLE_MOVED, COMSIG_PARENT_QDELETING), .proc/remove_shaftpiece)
 	transmission_shafts += SP
 
-/obj/structure/mechanical/gear/shaftbox/proc/remove_shaftpiece(obj/effect/shaftpiece/SP)
+/obj/structure/mechanical/gear/shaftbox/proc/remove_shaftpiece(obj/structure/shaftpiece/SP)
 	SIGNAL_HANDLER
 	UnregisterSignal(SP, list(COMSIG_MOVABLE_MOVED, COMSIG_PARENT_QDELETING))
 	locate_components()
@@ -102,6 +103,12 @@
 	else
 		connects = EAST | WEST
 
+/obj/structure/mechanical/gear/shaftbox/Destroy()
+	if(!QDELETED(adapter))
+		qdel(adapter)
+	adapter = null
+	transmission_shafts = null
+	return ..()
 
 /obj/structure/shaftpiece
 	name = "transmission shaft"
@@ -118,7 +125,7 @@
 	desc = "An adapter that connects gearwheels to the shaft gearbox"
 	var/obj/structure/mechanical/gear/shaftbox/shaftbox
 
-/obj/structure/mechanical/gear/shaftbox/LateInitialize()
+/obj/structure/mechanical/gear/shaftbox_adapter/LateInitialize()
 	shaftbox = locate() in loc
 	if(!shaftbox)
 		qdel(src)
@@ -135,9 +142,15 @@
 			connected  -= G
 	shaftbox = locate() in loc
 	if(!shaftbox)
-		qdel(src)
+		QDEL_IN(src, 0) // QDEL_IN because we don't want to kill ourselves while the subsystem is enumerating over us
 		return
 	connect(shaftbox)
+
+/obj/structure/mechanical/gear/shaftbox_adapter/Destroy()
+	if(!QDELETED(shaftbox))
+		qdel(shaftbox)
+	shaftbox = null
+	return ..()
 
 #undef SHAFT_ROTATE_CLOCKWISE
 #undef SHAFT_ROTATE_NONE

@@ -32,12 +32,6 @@
 	bound_width = round(radius * 64, 32)
 	bound_height = round(radius * 64, 32)
 
-/obj/structure/mechanical/proc/locate_flywheel()
-	for(var/obj/structure/flywheel/W in GLOB.mechanical)
-		if(get_dist(src, W) == W.radius * 2)
-			return W
-	return FALSE
-
 /obj/structure/mechanical/proc/locate_components()
 	return TRUE
 

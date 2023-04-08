@@ -1,5 +1,8 @@
-// only works accurately for disk flywheels of uniform thickness.
+// Only works accurately for disk flywheels of uniform thickness.
 #define INERTIAL_CONSTANT 0.5
+
+// Should be set to the largest
+#define MAX_FLYWHEEL_RADIUS 1.5
 
 /obj/structure/flywheel
 	name = "flywheel"
@@ -173,15 +176,9 @@
 	QDEL_NULL(soundloop)
 	return ..()
 
-/obj/structure/mechanical/bearing/locate_flywheel()
-	for(var/obj/structure/flywheel/W in GLOB.mechanical)
-		if(W.loc == loc)
-			flywheel = W
-			return TRUE
-	return FALSE
-
 /obj/structure/mechanical/bearing/locate_components()
-	return locate_flywheel()
+	flywheel = locate() in loc
+	return flywheel
 
 /obj/structure/mechanical/bearing/proc/start()
 	if(!flywheel && !locate_components())
@@ -222,7 +219,7 @@
 	var/obj/structure/cable/cable
 
 /obj/structure/mechanical/flywheel_motor/locate_components()
-	for(var/obj/structure/flywheel/W in GLOB.mechanical)
+	for(var/obj/structure/flywheel/W in oview(MAX_FLYWHEEL_RADIUS * 2, src))
 		if(is_connected_euclidian(W)) //TODO: get_con_dist for flywheels
 			flywheel = W
 			return TRUE
@@ -256,3 +253,6 @@
 	if(added > 0)
 		cable.add_avail(added / GLOB.CELLRATE) // convert joules to watts
 		flywheel.suck_energy(added)
+
+#undef INERTIAL_CONSTANT
+#undef MAX_FLYWHEEL_RADIUS

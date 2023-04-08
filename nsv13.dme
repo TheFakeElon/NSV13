@@ -3982,7 +3982,6 @@
 #include "nsv13\code\modules\power\mechanical\flywheel.dm"
 #include "nsv13\code\modules\power\mechanical\gearnet.dm"
 #include "nsv13\code\modules\power\mechanical\rotor.dm"
-#include "nsv13\code\modules\power\mechanical\shaft.dm"
 #include "nsv13\code\modules\power\multicellcharger\multi_cell_charger.dm"
 #include "nsv13\code\modules\power\reactor\control_rods.dm"
 #include "nsv13\code\modules\power\reactor\fuel_rods.dm"

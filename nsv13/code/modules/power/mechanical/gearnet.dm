@@ -78,29 +78,3 @@
 				CG.transmission_act(gear)
 		wklen = length(worklist)
 		CHECK_TICK
-
-/*
-//Merge two gearnets, the bigger (in gear length term) absorbing the other
-/proc/merge_gearnets(datum/gearnet/net1, datum/gearnet/net2)
-	if(!net1 || !net2) //if one of the gearnet doesn't exist, return
-		return
-
-	if(net1 == net2) //don't merge same gearnets
-		return
-
-	//We assume net1 is larger. If net2 is in fact larger we are just going to make them switch places to reduce on code.
-	if(length(net1.gears) < length(net2.gears))	//net2 is larger than net1. Let's switch them around
-		var/temp = net1
-		net1 = net2
-		net2 = temp
-	//merge net2 into net1
-	for(var/obj/structure/mechanical/M as() in net2.gears) //merge cables
-		net1.add_gear(M)
-/*
-	for(var/obj/structure/mechanical/M as() in net2.machines) //merge power machines
-		if(!M.locate_components())
-			M.gearnet = null //if somehow we can't connect the machine to the new gearnet, disconnect it from the old nonetheless
-*/
-
-	return net1
-*/
