@@ -94,8 +94,6 @@ SUBSYSTEM_DEF(mechanics)
 	return largest_GN
 
 
-
-
 /datum/controller/subsystem/mechanics/Recover()
 	if(istype(SSmechanics.gearnets))
 		gearnets = SSmechanics.gearnets

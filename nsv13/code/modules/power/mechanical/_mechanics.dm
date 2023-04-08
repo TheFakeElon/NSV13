@@ -92,30 +92,19 @@
 
 // setup connection with another gear
 /obj/structure/mechanical/gear/proc/connect(obj/structure/mechanical/gear/OG)
-	if(OG.can_connect(src))
-		connected[OG] = OG.radius / radius
-
-// Get connected gears, should only be used during mapload, explanation can be found below.
-/obj/structure/mechanical/gear/proc/update_mapload_connections()
-	for(var/obj/structure/mechanical/gear/G in GLOB.gears)
-		if(G == src)
-			continue
-		if(is_connected_cardinal(G))
-			connect(G)
-
-/*
-*	Unlike update_mapload_connections, update_connections has to be a catch all as any gear needs to capable of finding it's connected gears on it's own.
-*	For example, we only need to use euclidian distance for large gears on mapload because they can modfy the smaller gear's connected list to include themselves (large gear) for them (small gear)
-*	However; after mapload, a newly placed small gear wouldn't be able to determine it's connected to a large gear without using euclidian distance
-*	So we use seperate the procs, get_connnections() for non-dependent checks post mapload and update_mapload_connections() for more performant checks when large/euclidian checking
-*	gears will help
-*/
+	if(!OG.can_connect(src))
+		return
+	connected += OG
+	if(SSmechanics.initialized && can_connect(OG))
+		OG.connected |= src
+// Looks through all gears on the map and connects if our radii intersect, but not overlap.
+// could be optimize in the future if we ever get/port spatial partitioning.
 /obj/structure/mechanical/gear/proc/update_connections()
 	connected.len = 0
-	for(var/obj/structure/mechanical/gear/G in GLOB.gears)
+	for(var/obj/structure/mechanical/gear/G as() in GLOB.gears)
 		if(G == src)
 			continue
-		if(is_connected_euclidian(G)) // the only difference between mapload
+		if(is_connected_euclidian(G))
 			connect(G)
 
 /*
@@ -136,18 +125,10 @@
 	. = ..()
 	if(. && (var_name == NAMEOF(src, rpm) || var_name == NAMEOF(src, torque))) // don't do this admins. You will probably break something
 		update_animation() // I'm stll mad you did it >:(
+		//SSmechanics.update(src)
 
 /obj/structure/mechanical/gear/large
 	name = "large plasteel gear"
 	desc = "A large gear used to transfer mechanical energy between objects, designed to be conencted diagonally."
 	icon_state = "cog2"
 	radius = 0.914 // 1 tile diagonal distance (sqrt(2)) - gear radius (0.5) gets you 0.914 after rounding, the radius required for a diagonal connection with a small gear from 1 tile away
-
-// only large gears handle need to get diagonal connections on mapload
-/obj/structure/mechanical/gear/large/update_mapload_connections()
-	for(var/obj/structure/mechanical/gear/G in GLOB.gears)
-		if(G == src)
-			continue
-		if(is_connected_euclidian(G))
-			connect(G)
-			G.connect(src)

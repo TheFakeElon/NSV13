@@ -46,10 +46,7 @@
 			continue
 
 		add_gear(gear)
-		if(mapload)
-			gear.update_mapload_connections()
-		else
-			gear.update_connections()
+		gear.update_connections()
 
 		for(var/obj/structure/mechanical/gear/CG as() in gear.connected)
 			if(CG.gearnet != src)
@@ -59,10 +56,7 @@
 
 /datum/gearnet/proc/update_network(obj/structure/mechanical/gear/source)
 	version++
-	var/list/worklist = list()
-	// iterating because we only want the keys from the 2D list
-	for(var/obj/structure/mechanical/gear/SG as() in source.connected)
-		worklist += SG
+	var/list/worklist = list(source)
 
 	var/wklen = length(worklist)
 	var/obj/structure/mechanical/gear/gear
@@ -72,6 +66,7 @@
 		if(gear.gearnet_ver == version)
 			wklen = length(worklist)
 			continue
+		gear.gearnet_ver = version
 		for(var/obj/structure/mechanical/gear/CG as() in gear.connected)
 			if(CG.gearnet_ver != version)
 				worklist += CG
