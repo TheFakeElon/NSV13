@@ -1,8 +1,28 @@
 #define SHAFT_ROTATE_CLOCKWISE 1
 #define SHAFT_ROTATE_NONE 0
 #define SHAFT_ROTATE_ANTICLOCKWISE -1
+// Max iconstate number in the shaftpiece dmi
+#define SHAFTPIECE_ICONSTATE_MAX 8
 
-// Shaftbox components
+// Locates any valid shafts we can connect to, returns shaft datum if found.
+// Takes a bitfield of valid connection directions.
+/obj/structure/mechanical/proc/find_shaft(dirs)
+	var/turf/NT = get_turf(src)
+	for(var/direction in GLOB.cardinals)
+		if(!(direction & dirs))
+			continue
+		NT = get_step(src, direction)
+		for(var/obj/structure/mechanical/gear/shaftbox/SB in NT)
+			if(SB.shaft && (dir & SB.shaft.axis.valid))
+				return SB.shaft
+		for(var/obj/structure/mechanical/shaftpiece/SP in NT)
+			if(SP.shaft && (dir & SP.shaft.axis.valid))
+				return SP.shaft
+	return null
+
+
+// ------------ Shaft box ------------
+
 
 /obj/structure/mechanical/gear/shaftbox
 	name = "shaft gearbox"
@@ -34,9 +54,12 @@
 
 /obj/structure/mechanical/gear/shaftbox/locate_components()
 	if(!shaft)
-		shaft = new(src)
-		shaft.update(FALSE)
-	else if(shaft.master == src)
+		// if we're bidirectional, scan behind us too
+		shaft = find_shaft(bidirectional ? (dir | turn(dir, 180)) : dir)
+		if(!shaft)
+			shaft = new(src)
+			shaft.update(FALSE)
+	else if(shaft.master == src) // we wouldn't be master if we located an existing shaft, and we would have already updated if we just made one.
 		shaft.update()
 	connected += shaft.shaftboxes - src
 
@@ -44,50 +67,14 @@
 	if(!QDELETED(adapter))
 		qdel(adapter)
 	adapter = null
-	if(shaft)
-		shaft.shaftboxes -= src
-		shaft = null
+	shaft?.remove_shaftbox(src)
+	shaft = null
 	return ..()
 
-/obj/structure/shaftpiece
-	name = "transmission shaft"
-	desc = "Moves kinetic energy along a linear axis."
-	icon = 'nsv13/icons/obj/machinery/shaft.dmi'
-	icon_state = "shaft_idle"
-	layer = ABOVE_OBJ_LAYER
-	var/datum/shaft/shaft
 
-/obj/structure/shaftpiece/Initialize()
-	..()
-	return INITIALIZE_HINT_LATELOAD
+// ------------ Shaft box adapters ------------
 
-/obj/structure/shaftpiece/LateInitialize()
-	if(SSmechanics.initialized && !shaft)
-		find_shaftbox()
-
-/obj/structure/shaftpiece/proc/find_shaftbox()
-	var/valid_con_dirs
-	if(dir & (NORTH | SOUTH))
-		valid_con_dirs = NORTH | SOUTH
-	else
-		valid_con_dirs = EAST | WEST
-
-	var/turf/NT = get_turf(src)
-	for(var/direction in GLOB.cardinals)
-		if(!(direction & valid_con_dirs))
-			continue
-		NT = get_step(src, direction)
-		for(var/obj/structure/mechanical/gear/shaftbox/SB in NT)
-			if(SB.shaft && (dir & SB.shaft.axis.valid))
-				SB.shaft.update(TRUE)
-				return
-		for(var/obj/structure/shaftpiece/SP in NT)
-			if(SP.shaft && (dir & SP.shaft.axis.valid))
-				SP.shaft.update(TRUE)
-				return
-
-// The bevel adapter between normal gears and the shaft gear box.
-// Created by the shaft gearbox on spawn.
+// The bevel adapter between normal gears and the shaft gear box. Created by the shaft gearbox on spawn.
 /obj/structure/mechanical/gear/shaftbox_adapter
 	name = "gear adapter"
 	desc = "An adapter that connects gearwheels to the shaft gearbox"
@@ -122,6 +109,32 @@
 		qdel(shaftbox)
 	shaftbox = null
 	return ..()
+
+
+// ------------ Shaft pieces ------------
+
+
+/obj/structure/mechanical/shaftpiece
+	name = "transmission shaft"
+	desc = "Moves kinetic energy along a linear axis."
+	icon = 'nsv13/icons/obj/machinery/shaft.dmi'
+	icon_state = "shaft_idle"
+	layer = ABOVE_OBJ_LAYER
+	var/datum/shaft/shaft
+
+/obj/structure/mechanical/shaftpiece/Initialize()
+	..()
+	return INITIALIZE_HINT_LATELOAD
+
+/obj/structure/mechanical/shaftpiece/LateInitialize()
+	if(SSmechanics.initialized && !shaft)
+		shaft = find_shaft(dir | turn(dir, 180))
+
+/obj/structure/mechanical/shaftpiece/Destroy()
+	shaft?.remove_shaftpiece(src)
+	return ..()
+
+// ------------ Shaft datum ------------
 
 
 /datum/shaft
@@ -164,7 +177,7 @@
 						SB.shaft = src
 					found = TRUE
 
-			for(var/obj/structure/shaftpiece/SP in NT)
+			for(var/obj/structure/mechanical/shaftpiece/SP in NT)
 				if(SP.dir & axis.valid)
 					if(SP.shaft != src)
 						shaft_pieces += SP
@@ -178,7 +191,7 @@
 	if(master)
 		shaftboxes = list(master)
 		master.shaft = src
-	for(var/obj/structure/shaftpiece/SP as() in shaft_pieces)
+	for(var/obj/structure/mechanical/shaftpiece/SP as() in shaft_pieces)
 		SP.icon_state = "shaft_idle"
 		SP.shaft = null
 	shaft_pieces.len = 0
@@ -195,7 +208,7 @@
 		else
 			// Which icon state number to use. Changes are more noticable at low speeds so I've made the relationship non-linear
 			// Unfortunately we're stuck with this until the day BYOND lets us change icon animation speed at runtime
-			var/iconstate_index = clamp(round(0.5 * sqrt(abs(master.rpm))), 1, 8)
+			var/iconstate_index = clamp(round(0.5 * sqrt(abs(master.rpm))), 1, SHAFTPIECE_ICONSTATE_MAX)
 			nicon = "shaft_[iconstate_index]"
 	else
 		nicon = "shaft_idle"
@@ -208,24 +221,41 @@
 			new_shaft_dir = axis.back
 		else
 			new_shaft_dir = axis.forward
-		for(var/obj/structure/shaftpiece/SP as() in shaft_pieces)
+		for(var/obj/structure/mechanical/shaftpiece/SP as() in shaft_pieces)
 			SP.icon_state = nicon
 			SP.dir = new_shaft_dir
 		last_rotate_dir = rotate_dir
 		last_assigned_icon = nicon
 	// if the rotation direction hasn't changed, we'll just check to see if we need to change the icon state
 	else if(nicon != last_assigned_icon)
-		for(var/obj/structure/shaftpiece/SP as() in shaft_pieces)
+		for(var/obj/structure/mechanical/shaftpiece/SP as() in shaft_pieces)
 			SP.icon_state = nicon
 		last_assigned_icon = nicon
 
 /datum/shaft/proc/find_master()
 	if(!length(shaftboxes))
+		reset()
 		QDEL_IN(src, 0)
 		return FALSE
 	master = shaftboxes[1]
 	axis.align(master)
 	return TRUE
+
+/datum/shaft/proc/remove_shaftbox(obj/structure/mechanical/gear/shaftbox/SB)
+	shaftboxes -= SB
+	SB.shaftbox = null // we should be nulling on SB's side too, just in case something weird happens.
+	if(master == SB && find_master())
+		update()
+
+/datum/shaft/proc/remove_shaftpiece(obj/structure/mechanical/shaftpiece/SP)
+	shaft_pieces -= SP
+	update()
+
+/datum/shaft/Destroy()
+	reset()
+	shaftboxes.len = 0 // because master is re-added in reset()
+	master = null
+	QDEL_NULL(axis)
 
 /datum/axis
 	var/forward // facing away from the source
@@ -240,3 +270,5 @@
 #undef SHAFT_ROTATE_CLOCKWISE
 #undef SHAFT_ROTATE_NONE
 #undef SHAFT_ROTATE_ANTICLOCKWISE
+
+#undef SHAFTPIECE_ICONSTATE_MAX
