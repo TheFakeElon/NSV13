@@ -4,6 +4,7 @@
 	var/atom/movable/patom 	// typecast of parent
 
 	var/rpm
+	var/max_rpm
 	var/torque
 	// Smaller virtual radius = less output rpm, more output torque
 	var/virtual_radius				// Used for determining connections in some scans and the gear ratio between us and the mechanical object.
@@ -11,7 +12,7 @@
 	var/target_type 				// Typepath of valid connections
 	var/obj/structure/mechanical/gear/connected
 
-/datum/component/mechanical_interface/Initialize(virtual_radius, target_type = /obj/structure/mechanical/gear)
+/datum/component/mechanical_interface/Initialize(virtual_radius, max_rpm, target_type = /obj/structure/mechanical/gear)
 	patom = parent
 	if(!istype(patom))
 		CRASH("Invalid parent type [parent.type]. Parent must be a movable atom.")
@@ -71,7 +72,7 @@
 /datum/component/mechanical_interface/proc/sync()
 	if(!connected)
 		return
-	var/gear_ratio connected.radius / virtual_radius
+	var/gear_ratio = connected.radius / virtual_radius
 	if(patom.loc == connected.loc)
 		rpm = connected.rpm
 		torque = connected.torque
