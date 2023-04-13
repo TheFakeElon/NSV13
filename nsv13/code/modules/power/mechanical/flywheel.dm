@@ -219,7 +219,7 @@
 
 /obj/structure/mechanical/flywheel_motor/locate_components()
 	for(var/obj/structure/mechanical/flywheel/W in oview(MAX_FLYWHEEL_RADIUS * 2, src))
-		if(is_connected_euclidian(W)) //TODO: get_con_dist for flywheels
+		if(is_connected_euclidian(src, W)) //TODO: get_con_dist for flywheels
 			flywheel = W
 			return TRUE
 	return FALSE

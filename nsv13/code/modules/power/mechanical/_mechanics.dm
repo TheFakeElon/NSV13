@@ -2,12 +2,12 @@
 #define is_connected_cardinal(M) (loc == M.loc || ((x == M.x || y == M.y) && get_dist(src, M) == radius + M.radius))
 /*
  * Uses a broader equivalency because irrational figures + floating point numbers is not fun.
- * Ideally we'd use truncation instead but we don't have that yet because byond.
+ * Ideally we'd use truncation instead but we don't have that yet.
  * This technically means that *massive* gears may fail to connect but that shouldn't matter outside of extreme adminbus
  * This gets called a lot in loops so it's a define to reduce overhead
 */
 /// Checks if the selected mechanical part is touching us, accounts for diagonal connections. All post-mapload connection checks should use this. Expensive.
-#define is_connected_euclidian(M) (loc == M.loc || ISEQUIVALENT(sqrt((x - M.x)*(x - M.x) + (y - M.y)*(y - M.y)), (radius + M.radius), 0.01))
+#define is_connected_euclidian(A, B) (A.loc == B.loc || ISEQUIVALENT(sqrt((A.x - B.x)*(A.x - B.x) + (A.y - B.y)*(A.y - B.y)), (A.radius + B.radius), 0.01))
 
 
 /obj/structure/mechanical
@@ -119,7 +119,7 @@
 	for(var/obj/structure/mechanical/gear/G as() in GLOB.gears)
 		if(G == src)
 			continue
-		if(is_connected_euclidian(G))
+		if(is_connected_euclidian(src, G))
 			connect(G)
 
 /*

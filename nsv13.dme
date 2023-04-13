@@ -3981,6 +3981,7 @@
 #include "nsv13\code\modules\power\mechanical\_mechanics.dm"
 #include "nsv13\code\modules\power\mechanical\flywheel.dm"
 #include "nsv13\code\modules\power\mechanical\gearnet.dm"
+#include "nsv13\code\modules\power\mechanical\mechanical_component.dm"
 #include "nsv13\code\modules\power\mechanical\rotor.dm"
 #include "nsv13\code\modules\power\mechanical\shaft.dm"
 #include "nsv13\code\modules\power\mechanical\turbine.dm"
