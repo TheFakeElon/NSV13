@@ -32,17 +32,32 @@
 	bound_width = round(radius * 64, 32)
 	bound_height = round(radius * 64, 32)
 
+/obj/structure/mechanical/examine(mob/user)
+	. = ..()
+	if(!rpm)
+		return
+	// if we're not a silicon or ghost, we need to have mesons on to see the RPM
+	if(!isobserver(user) && !issilicon(user))
+		var/mob/living/carbon/C = user
+		if(!istype(C) || !C.glasses || !istype(C.glasses, /obj/item/clothing/glasses/meson))
+			return
+	. += mechanical_details(user)
+
 /obj/structure/mechanical/proc/locate_components()
 	return TRUE
 
 /obj/structure/mechanical/proc/check_stress()
-	if(rpm > max_rpm)
+	if(abs(rpm) > max_rpm)
 		overstress()
 
 /// This should always destroy or disable the device when called.
 /obj/structure/mechanical/proc/overstress()
 	visible_message("<span class='alert'>\The [src] breaks under the stress!</span>")
 	qdel(src)
+
+/// Returns string(s) containing mechanical details about the part
+/obj/structure/mechanical/proc/mechanical_details(mob/user)
+	return "<span class='info'>It's rotating <b>[round(abs(rpm), 0.1)]</b> times per minute.</span>"
 
 
 // Basic gear
@@ -111,9 +126,14 @@
  * Called by gearnets, handles change in the network.
 */
 /obj/structure/mechanical/gear/proc/transmission_act(obj/structure/mechanical/gear/caller)
-	var/Gratio = caller.radius / radius
-	rpm = -caller.rpm * Gratio
-	torque = caller.torque / Gratio
+	// if we're on the same axle, we have the same torque and RPM.
+	if(caller.loc == loc)
+		rpm = caller.rpm
+		torque = caller.torque
+	else
+		var/Gratio = caller.radius / radius
+		rpm = -caller.rpm * Gratio
+		torque = caller.torque / Gratio
 	update_animation()
 
 /obj/structure/mechanical/gear/proc/update_animation()
@@ -123,12 +143,12 @@
 
 /obj/structure/mechanical/gear/vv_edit_var(var_name, var_value)
 	. = ..()
-	if(. && (var_name == NAMEOF(src, rpm) || var_name == NAMEOF(src, torque))) // don't do this admins. You will probably break something
+	if(. && (var_name == NAMEOF(src, rpm) || var_name == NAMEOF(src, torque))) // Don't do this admins. You will probably break something
 		update_animation() // I'm stll mad you did it >:(
-		//SSmechanics.update(src)
+		SSmechanics.update(src)
 
 /obj/structure/mechanical/gear/large
 	name = "large plasteel gear"
-	desc = "A large gear used to transfer mechanical energy between objects, designed to be conencted diagonally."
+	desc = "A large gear used to transfer mechanical energy between objects, designed to be connected diagonally."
 	icon_state = "cog2"
 	radius = 0.914 // 1 tile diagonal distance (sqrt(2)) - gear radius (0.5) gets you 0.914 after rounding, the radius required for a diagonal connection with a small gear from 1 tile away

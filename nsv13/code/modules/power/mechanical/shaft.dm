@@ -33,9 +33,13 @@
 	var/bidirectional = FALSE // set to true if the shaft can pass through both sides of the shaft box
 
 /obj/structure/mechanical/gear/shaftbox/LateInitialize()
-	adapter = new(loc)
+	adapter = locate() in loc
+	if(!adapter)
+		adapter = new(loc)
 	adapter.layer = layer - 0.01
-	radius = adapter.radius // 1:1
+	//radius = adapter.radius // 1:1
+	RegisterSignal(adapter, COMSIG_ATOM_DIR_CHANGE, .proc/dir_change)
+	RegisterSignal(src, COMSIG_ATOM_DIR_CHANGE, .proc/dir_change)
 	..()
 
 // we don't connect to normal gears, only our adapter and other shaft boxes
@@ -55,13 +59,31 @@
 /obj/structure/mechanical/gear/shaftbox/locate_components()
 	if(!shaft)
 		// if we're bidirectional, scan behind us too
-		shaft = find_shaft(bidirectional ? (dir | turn(dir, 180)) : dir)
+		var/datum/shaft/oshaft = find_shaft(bidirectional ? (dir | turn(dir, 180)) : dir)
+		oshaft?.update()
 		if(!shaft)
 			shaft = new(src)
 			shaft.update(FALSE)
 	else if(shaft.master == src) // we wouldn't be master if we located an existing shaft, and we would have already updated if we just made one.
 		shaft.update()
-	connected += shaft.shaftboxes - src
+	for(var/obj/structure/mechanical/gear/shaftbox/SB as() in shaft.shaftboxes)
+		if(SB != src)
+			connect(SB)
+
+/obj/structure/mechanical/gear/shaftbox/Moved(atom/OldLoc, Dir)
+	. = ..()
+	if(adapter?.loc != loc)
+		adapter.forceMove(loc)
+	update_connections()
+
+/obj/structure/mechanical/gear/shaftbox/proc/dir_change()
+	SIGNAL_HANDLER
+	if(!adapter)
+		return
+	adapter.dir = turn(dir, 180)
+	if(shaft?.master == src)
+		shaft.axis.align(src)
+	update_connections()
 
 /obj/structure/mechanical/gear/shaftbox/Destroy()
 	if(!QDELETED(adapter))
@@ -86,7 +108,7 @@
 	if(!shaftbox)
 		qdel(src)
 		return
-	dir = turn(shaftbox.dir, 180)
+	setDir(turn(shaftbox.dir, 180))
 	..()
 
 /obj/structure/mechanical/gear/shaftbox_adapter/update_connections()
@@ -128,10 +150,12 @@
 
 /obj/structure/mechanical/shaftpiece/LateInitialize()
 	if(SSmechanics.initialized && !shaft)
-		shaft = find_shaft(dir | turn(dir, 180))
+		var/datum/shaft/oshaft = find_shaft(dir | turn(dir, 180))
+		oshaft?.update()
 
 /obj/structure/mechanical/shaftpiece/Destroy()
 	shaft?.remove_shaftpiece(src)
+	shaft = null
 	return ..()
 
 // ------------ Shaft datum ------------
@@ -243,12 +267,13 @@
 
 /datum/shaft/proc/remove_shaftbox(obj/structure/mechanical/gear/shaftbox/SB)
 	shaftboxes -= SB
-	SB.shaftbox = null // we should be nulling on SB's side too, just in case something weird happens.
+	SB.shaft = null // we should be nulling on SB's side too, just in case something weird happens.
 	if(master == SB && find_master())
 		update()
 
 /datum/shaft/proc/remove_shaftpiece(obj/structure/mechanical/shaftpiece/SP)
 	shaft_pieces -= SP
+	SP.shaft = null
 	update()
 
 /datum/shaft/Destroy()
@@ -256,6 +281,7 @@
 	shaftboxes.len = 0 // because master is re-added in reset()
 	master = null
 	QDEL_NULL(axis)
+	return ..()
 
 /datum/axis
 	var/forward // facing away from the source

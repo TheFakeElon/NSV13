@@ -4,18 +4,17 @@
 // Should be set to the largest
 #define MAX_FLYWHEEL_RADIUS 1.5
 
-/obj/structure/flywheel
+/obj/structure/mechanical/flywheel
 	name = "flywheel"
 	desc = "An extremely durable, dense disk capable of storing large amounts of kinetic energy"
 	icon_state = "flywheel"
 	appearance_flags = KEEP_TOGETHER
 	pixel_x = -16
 	pixel_y = -16
-	var/radius = 1 // hitboxes are dynamically asigned on intialize from this
+	radius = 1
 	// bearing should always be on the same tile as the flywheel
 	var/obj/structure/mechanical/bearing/bearing
 	var/mass = 100 // mass in kilograms.
-	var/rpm = 0
 	var/angular_mass = 0
 
 	var/loose = FALSE
@@ -23,28 +22,28 @@
 	var/list/shitlist = list() // Mobs who aren't going to live much longer
 	var/mob/shitlist_target
 
-/obj/structure/flywheel/Initialize()
+/obj/structure/mechanical/flywheel/Initialize()
 	. = ..()
 	angular_mass = get_inertia()
 	bearing = locate() in loc
 	if(bearing)
 		footloose(FALSE)
 
-/obj/structure/flywheel/proc/get_inertia() // Maths
+/obj/structure/mechanical/flywheel/proc/get_inertia() // Maths
 	return INERTIAL_CONSTANT * mass * (radius * radius)
 
 // returns the total energy stored in the flywheel(s) in joules
-/obj/structure/flywheel/proc/get_energy()
+/obj/structure/mechanical/flywheel/proc/get_energy()
 	return 0.5 * angular_mass * (RPM_TO_RADS(rpm) ** 2)
 
-/obj/structure/flywheel/proc/add_energy(joules, safe = FALSE)
+/obj/structure/mechanical/flywheel/proc/add_energy(joules, safe = FALSE)
 	var/rpm_increase = RADS_TO_RPM(sqrt(joules / (angular_mass / 2)))
 	rpm += rpm_increase
 	if(bearing)
 		bearing.rpm = rpm
 	return rpm_increase
 
-/obj/structure/flywheel/proc/footloose(prewobble = TRUE)
+/obj/structure/mechanical/flywheel/proc/footloose(prewobble = TRUE)
 	set waitfor = FALSE
 	if(rpm < 30)
 		no_more_footloose()
@@ -60,17 +59,17 @@
 	Move(get_step_rand(src))
 	START_PROCESSING(SSobj, src)
 
-/obj/structure/flywheel/proc/no_more_footloose()
+/obj/structure/mechanical/flywheel/proc/no_more_footloose()
 	visible_message("<span class='danger'>\The [src] tips over!</span>")
 	loose = FALSE
 	qdel(src)
 
-/obj/structure/flywheel/proc/suck_energy(joules)
+/obj/structure/mechanical/flywheel/proc/suck_energy(joules)
 	var/sucked = min(RADS_TO_RPM(sqrt(joules / (angular_mass / 2))), rpm)
 	rpm -= sucked
 	return sucked
 
-/obj/structure/flywheel/process()
+/obj/structure/mechanical/flywheel/process()
 	if(!loose)
 		return PROCESS_KILL
 	if(rpm < 30)
@@ -98,20 +97,20 @@
 	else
 		suck_energy(1)
 
-/obj/structure/flywheel/Destroy()
+/obj/structure/mechanical/flywheel/Destroy()
 	bearing = null
 	STOP_PROCESSING(SSobj, src)
 	return ..()
 
-/obj/structure/flywheel/Bump(atom/movable/AM)
+/obj/structure/mechanical/flywheel/Bump(atom/movable/AM)
 	contact(AM)
 	return ..()
 
-/obj/structure/flywheel/Bumped(atom/movable/AM)
+/obj/structure/mechanical/flywheel/Bumped(atom/movable/AM)
 	..()
 	contact(AM)
 
-/obj/structure/flywheel/proc/contact(atom/movable/AM)
+/obj/structure/mechanical/flywheel/proc/contact(atom/movable/AM)
 	var/bonk = round(log(rpm) * 10, 1)
 	playsound(src, 'sound/effects/clang.ogg', min(bonk, 110), FALSE)
 	if(bonk > 25 && iswallturf(AM))
@@ -132,7 +131,7 @@
 	AM?.throw_at(get_edge_target_turf(src, get_dir(src, AM), bonk, bonk / 10))
 	suck_energy(1000)
 
-/obj/structure/flywheel/small
+/obj/structure/mechanical/flywheel/small
 	name = "small flywheel"
 	desc = "An extremely durable and dense disk capable of storing large amounts of kinetic energy. This one is a bit smaller than most."
 	icon_state = "flywheel_small"
@@ -141,7 +140,7 @@
 	radius = 0.5
 	mass = 50
 
-/obj/structure/flywheel/large
+/obj/structure/mechanical/flywheel/large
 	name = "large flywheel"
 	desc = "An extremely durable and dense disk capable of storing large amounts of kinetic energy. This one is a bit bulkier than most."
 	icon_state = "flywheel_large"
@@ -161,7 +160,7 @@
 	var/instability_threshold = 5
 	var/datum/looping_sound/flywheel/soundloop
 
-	var/obj/structure/flywheel/flywheel // connected flywheel, if any
+	var/obj/structure/mechanical/flywheel/flywheel // connected flywheel, if any
 
 /obj/structure/mechanical/bearing/Initialize()
 	. = ..()
@@ -215,11 +214,11 @@
 	radius = 0.5 // radius of the rotor
 	var/max_power = 50000 // max input/output in joules
 	var/current_power = 0 // current amount of input
-	var/obj/structure/flywheel/flywheel // connected flywheel, if any
+	var/obj/structure/mechanical/flywheel/flywheel // connected flywheel, if any
 	var/obj/structure/cable/cable
 
 /obj/structure/mechanical/flywheel_motor/locate_components()
-	for(var/obj/structure/flywheel/W in oview(MAX_FLYWHEEL_RADIUS * 2, src))
+	for(var/obj/structure/mechanical/flywheel/W in oview(MAX_FLYWHEEL_RADIUS * 2, src))
 		if(is_connected_euclidian(W)) //TODO: get_con_dist for flywheels
 			flywheel = W
 			return TRUE
