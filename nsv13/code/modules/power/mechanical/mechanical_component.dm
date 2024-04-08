@@ -7,17 +7,20 @@
 	var/max_rpm
 	var/torque
 	// Smaller virtual radius = less output rpm, more output torque
-	var/virtual_radius				// Used for determining connections in some scans and the gear ratio between us and the mechanical object.
+	var/virt_gear_radius			// Used for determining connections in some scans and the gear ratio between us and the mechanical object.
+	// Should be TRUE if the attached device is connected to the mechanical object via axle
+	// Should be FALSE if the attached device is connected through contact
 
 	var/target_type 				// Typepath of valid connections
 	var/obj/structure/mechanical/gear/connected
 
-/datum/component/mechanical_interface/Initialize(virtual_radius, max_rpm, target_type = /obj/structure/mechanical/gear)
+/datum/component/mechanical_interface/Initialize(virt_gear_radius, max_rpm, target_type = /obj/structure/mechanical/gear, axle_connection = TRUE)
 	patom = parent
 	if(!istype(patom))
 		CRASH("Invalid parent type [parent.type]. Parent must be a movable atom.")
-	src.virtual_radius = virtual_radius
+	src.virt_gear_radius = virt_gear_radius
 	src.target_type = target_type
+	src.axle_connection = axle_connection
 
 /// Scan our tile for a connection
 /datum/component/mechanical_interface/proc/scan_loc()
@@ -33,7 +36,7 @@
 */
 /datum/component/mechanical_interface/proc/scan_adjacent(check_dirs = ALL, valid_target_dirs = ALL)
 	for(var/cdir in GLOB.cardinals)
-		if(!(cdir & valid_dirs))
+		if(!(cdir & check_dirs))
 			continue
 		for(var/obj/structure/mechanical/gear/M in get_step(patom, cdir))
 			if((M.dir & valid_target_dirs) && istype(M, target_type))
@@ -46,12 +49,12 @@
 /datum/component/mechanical_interface/proc/scan_radius(check_dirs = ALL)
 	var/dx
 	var/dy
-	for(var/obj/structure/mechanical/gear/M in oview(virtual_radius * 2, patom))
+	for(var/obj/structure/mechanical/gear/M in oview(virt_gear_radius * 2, patom))
 		if(!istype(M, target_type) || !(get_dir(patom, M) & check_dirs))
 			continue
 		dx = patom.x - M.x
 		dy = patom.y - M.y
-		if(ISEQUIVALENT(sqrt(dx*dx + dy*dy), (virtual_radius + M.radius), 0.01))
+		if(ISEQUIVALENT(sqrt(dx*dx + dy*dy), (virt_gear_radius + M.radius), 0.01))
 			connected = M
 			return TRUE
 	return FALSE
@@ -60,8 +63,8 @@
 /datum/component/mechanical_interface/proc/apply()
 	if(!connected)
 		return
-	var/gear_ratio = virtual_radius / connected.radius
-	if(patom.loc == connected.loc)
+	var/gear_ratio = virt_gear_radius / connected.radius
+	if(connected.loc == patom.loc)
 		connected.rpm = rpm
 		connected.torque = torque
 	else
@@ -72,8 +75,8 @@
 /datum/component/mechanical_interface/proc/sync()
 	if(!connected)
 		return
-	var/gear_ratio = connected.radius / virtual_radius
-	if(patom.loc == connected.loc)
+	var/gear_ratio = connected.radius / virt_gear_radius
+	if(connected.loc == patom.loc)
 		rpm = connected.rpm
 		torque = connected.torque
 	else
