@@ -320,7 +320,7 @@
 		return
 	if(listeningTo)
 		UnregisterSignal(listeningTo, COMSIG_MOVABLE_MOVED)
-	RegisterSignal(user, COMSIG_MOVABLE_MOVED, .proc/on_mob_move)
+	RegisterSignal(user, COMSIG_MOVABLE_MOVED, PROC_REF(on_mob_move))
 	listeningTo = user
 
 /obj/item/clothing/suit/space/hardsuit/syndi/peacekeeper/dropped()
@@ -418,7 +418,7 @@
 		return
 	cooldown = TRUE
 	UpdateButtonIcon()
-	addtimer(CALLBACK(src, .proc/reset_cooldown), 10 SECONDS)
+	addtimer(CALLBACK(src, PROC_REF(reset_cooldown)), 10 SECONDS)
 	var/message = pick("[user] strikes a menacing pose", "[user] poses menacingly", "[user] looks menacing")
 	user.visible_message("<span class='game deadsay'>[message]</span>")
 	user.shake_animation()
@@ -795,3 +795,41 @@
 		w_class = WEIGHT_CLASS_SMALL
 
 	rolled_up = !rolled_up
+
+/obj/item/clothing/head/maidheadband/syndicate
+	name = "tactical maid headband"
+	desc = "Tacticute."
+	icon = 'nsv13/icons/obj/clothing/hats.dmi'
+	worn_icon = 'nsv13/icons/mob/head.dmi'
+	icon_state = "syndieheadband"
+	item_state = "syndieheadband"
+
+/obj/item/clothing/under/syndicate/maid
+	name = "tactical maid outfit"
+	desc = "A 'tactical' turtleneck fashioned to the likeness of a maid outfit. Why the Syndicate has these, you'll never know."
+	icon = 'nsv13/icons/obj/clothing/uniforms.dmi'
+	worn_icon = 'nsv13/icons/mob/uniform.dmi'
+	icon_state = "syndimaid"
+	item_state = "syndimaid"
+	can_adjust = FALSE
+
+/obj/item/clothing/under/syndicate/skirt/maid/Initialize()
+	. = ..()
+	var/obj/item/clothing/accessory/maidapron/syndicate/A = new (src)
+	attach_accessory(A)
+
+/obj/item/clothing/gloves/combat/maid
+	name = "combat maid sleeves"
+	desc = "These 'tactical' gloves and sleeves are fireproof and electrically insulated. Warm to boot."
+	icon = 'nsv13/icons/obj/clothing/gloves.dmi'
+	worn_icon = 'nsv13/icons/mob/hands.dmi'
+	icon_state = "syndimaid_arms"
+	worn_icon_state = "syndimaid_arms"
+	item_state = "syndimaid_arms"
+
+/obj/item/clothing/accessory/maidapron/syndicate
+	name = "syndicate maid apron"
+	desc = "Practical? No. Tactical? Also no. Cute? Most definitely yes."
+	icon = 'nsv13/icons/mob/accessories.dmi'
+	icon_state = "maidapronsynd"
+	item_state = "maidapronsynd"

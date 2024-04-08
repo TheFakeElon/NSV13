@@ -55,8 +55,8 @@
 
 	if(istype(parent, /obj/item))
 		var/obj/item/holder = parent
-		RegisterSignal(holder, COMSIG_ITEM_EQUIPPED, .proc/on_equip)
-		RegisterSignal(holder, COMSIG_ITEM_DROPPED, .proc/on_drop)
+		RegisterSignal(holder, COMSIG_ITEM_EQUIPPED, PROC_REF(on_equip))
+		RegisterSignal(holder, COMSIG_ITEM_DROPPED, PROC_REF(on_drop))
 		if(isliving(holder.loc)) //Account for items pre-spawned on people...
 			on_equip(holder, holder.loc, null)
 		return
@@ -76,9 +76,9 @@
 	holobutton.Remove(user)
 
 /datum/component/holomap/Destroy(force, silent)
-	//if(holobutton)
-	//	holobutton.Remove(get_user())
-	//	qdel(holobutton)
+	if(holobutton)
+		holobutton.Remove(get_user())
+		qdel(holobutton)
 	. = ..()
 
 /datum/component/holomap/proc/summon_holomap(datum/user)
@@ -99,10 +99,10 @@
 	return legend
 
 /datum/component/holomap/proc/activate_holomap(mob/user)
-	current_z_level = user.z
+	var/turf/current_turf = get_turf(user.client.eye)
+	current_z_level = current_turf.z
 	holomap_datum = new()
 	bogus = FALSE
-	var/turf/current_turf = get_turf(user)
 	if(!("[HOLOMAP_EXTRA_STATIONMAP]_[current_z_level]" in SSholomaps.extra_holomaps))
 		bogus = TRUE
 		holomap_datum.initialize_holomap_bogus()

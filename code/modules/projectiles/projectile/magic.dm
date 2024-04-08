@@ -434,15 +434,15 @@
 
 /obj/structure/closet/decay/Initialize(mapload)
 	. = ..()
-	addtimer(CALLBACK(src, .proc/locker_magic_timer), 5)
+	addtimer(CALLBACK(src, PROC_REF(locker_magic_timer)), 5)
 
 /obj/structure/closet/decay/proc/locker_magic_timer()
 	if(welded)
-		addtimer(CALLBACK(src, .proc/bust_open), 5 MINUTES)
+		addtimer(CALLBACK(src, PROC_REF(bust_open)), 5 MINUTES)
 		icon_state = magic_icon
 		update_icon()
 	else
-		addtimer(CALLBACK(src, .proc/decay), 15 SECONDS)
+		addtimer(CALLBACK(src, PROC_REF(decay)), 15 SECONDS)
 
 /obj/structure/closet/decay/after_weld(weld_state)
 	if(weld_state)
@@ -450,7 +450,7 @@
 
 /obj/structure/closet/decay/proc/decay()
 	animate(src, alpha = 0, time = 30)
-	addtimer(CALLBACK(GLOBAL_PROC, .proc/qdel, src), 30)
+	addtimer(CALLBACK(GLOBAL_PROC, GLOBAL_PROC_REF(qdel), src), 30)
 
 /obj/structure/closet/decay/open(mob/living/user)
 	. = ..()
@@ -458,12 +458,12 @@
 		if(icon_state == magic_icon) //check if we used the magic icon at all before giving it the lesser magic icon
 			unmagify()
 		else
-			addtimer(CALLBACK(src, .proc/decay), 15 SECONDS)
+			addtimer(CALLBACK(src, PROC_REF(decay)), 15 SECONDS)
 
 /obj/structure/closet/decay/proc/unmagify()
 	icon_state = weakened_icon
 	update_icon()
-	addtimer(CALLBACK(src, .proc/decay), 15 SECONDS)
+	addtimer(CALLBACK(src, PROC_REF(decay)), 15 SECONDS)
 
 /obj/item/projectile/magic/flying
 	name = "bolt of flying"
@@ -583,15 +583,17 @@
 /obj/item/projectile/magic/wipe/proc/possession_test(var/mob/living/carbon/M)
 	var/datum/brain_trauma/special/imaginary_friend/trapped_owner/trauma = M.gain_trauma(/datum/brain_trauma/special/imaginary_friend/trapped_owner)
 	var/poll_message = "Do you want to play as [M.real_name]?"
+	var/ban_key = BAN_ROLE_ALL_ANTAGONISTS
 	if(M.mind?.assigned_role)
 		poll_message = "[poll_message] Job:[M.mind.assigned_role]."
 	if(M.mind?.special_role)
 		poll_message = "[poll_message] Status:[M.mind.special_role]."
 	else if(M.mind)
-		var/datum/antagonist/A = M.mind.has_antag_datum(/datum/antagonist/)
+		var/datum/antagonist/A = M.mind.has_antag_datum(/datum/antagonist)
 		if(A)
 			poll_message = "[poll_message] Status:[A.name]."
-	var/list/mob/dead/observer/candidates = pollCandidatesForMob(poll_message, ROLE_PAI, null, FALSE, 100, M)
+			ban_key = A.banning_key
+	var/list/mob/dead/observer/candidates = pollCandidatesForMob(poll_message, ban_key, null, 10 SECONDS, M, ignore_category = FALSE)
 	if(M.stat == DEAD)//boo.
 		return
 	if(LAZYLEN(candidates))
@@ -713,7 +715,7 @@
 			return BULLET_ACT_BLOCK
 	var/turf/T = get_turf(target)
 	for(var/i=0, i<50, i+=10)
-		addtimer(CALLBACK(GLOBAL_PROC, .proc/explosion, T, -1, exp_heavy, exp_light, exp_flash, FALSE, FALSE, FALSE, TRUE), i)
+		addtimer(CALLBACK(GLOBAL_PROC, GLOBAL_PROC_REF(explosion), T, -1, exp_heavy, exp_light, exp_flash, FALSE, FALSE, FALSE, TRUE), i)
 
 //still magic related, but a different path
 

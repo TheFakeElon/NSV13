@@ -145,7 +145,7 @@ SUBSYSTEM_DEF(explosions)
 		else
 			continue
 
-	addtimer(CALLBACK(GLOBAL_PROC, .proc/wipe_color_and_text, wipe_colours), 100)
+	addtimer(CALLBACK(GLOBAL_PROC, GLOBAL_PROC_REF(wipe_color_and_text), wipe_colours), 100)
 
 /proc/wipe_color_and_text(list/atom/wiping)
 	for(var/i in wiping)
@@ -286,7 +286,7 @@ SUBSYSTEM_DEF(explosions)
 					M.playsound_local(epicenter, null, echo_volume, 1, frequency, S = explosion_echo_sound, distance_multiplier = 0)
 
 				if(creaking_explosion) // 5 seconds after the bang, the station begins to creak
-					addtimer(CALLBACK(M, /mob/proc/playsound_local, epicenter, null, rand(FREQ_LOWER, FREQ_UPPER), 1, frequency, null, null, TRUE, hull_creaking_sound, 0), CREAK_DELAY)
+					addtimer(CALLBACK(M, TYPE_PROC_REF(/mob, playsound_local), epicenter, null, rand(FREQ_LOWER, FREQ_UPPER), 1, frequency, null, null, TRUE, hull_creaking_sound, 0), CREAK_DELAY)
 
 	if(heavy_impact_range > 1)
 		var/datum/effect_system/explosion/E
@@ -414,6 +414,8 @@ SUBSYSTEM_DEF(explosions)
 			var/z_reduction = abs(epicenter.z - affecting_z) * (MULTI_Z_DISTANCE + 1)
 			var/turf/T = locate(epicenter.x, epicenter.y, affecting_z)
 			if(!T)
+				continue
+			if(devastation_range - z_reduction <= 0 && heavy_impact_range - z_reduction <= 0 && light_impact_range - z_reduction <= 0) //NSV13 - explosions still relaying with 0-0-0 can cause REALLY weird behavior.
 				continue
 			SSexplosions.explode(T,
 				max(devastation_range - z_reduction, 0),

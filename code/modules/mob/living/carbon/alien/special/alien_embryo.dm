@@ -73,7 +73,7 @@
 		additional_grow_time = min(additional_grow_time, 1 MINUTES)
 		COOLDOWN_START(src, next_stage_time, rand(30 SECONDS, 45 SECONDS) + additional_grow_time) // Somewhere from 2.5-3.5 minutes to fully grow
 		stage++
-		INVOKE_ASYNC(src, .proc/RefreshInfectionImage)
+		INVOKE_ASYNC(src, PROC_REF(RefreshInfectionImage))
 
 	if(stage == 5 && prob(50))
 		for(var/datum/surgery/S in owner.surgeries)
@@ -90,7 +90,7 @@
 
 	bursting = TRUE
 
-	var/list/candidates = pollGhostCandidates("Do you want to play as an alien larva that will burst out of [owner]?", ROLE_ALIEN, null, ROLE_ALIEN, 100, POLL_IGNORE_ALIEN_LARVA)
+	var/list/candidates = pollGhostCandidates("Do you want to play as an alien larva that will burst out of [owner]?", ROLE_ALIEN, /datum/role_preference/midround_ghost/xenomorph, 10 SECONDS, POLL_IGNORE_ALIEN_LARVA) // separate poll from xeno event spawns
 
 	if(QDELETED(src) || QDELETED(owner))
 		return

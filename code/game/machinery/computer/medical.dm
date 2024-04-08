@@ -106,17 +106,20 @@
 						dat += "<td><a href='?src=[REF(src)];field=show_photo_front'><img src=photo_front height=80 width=80 border=4></a></td>"
 						dat += "<td><a href='?src=[REF(src)];field=show_photo_side'><img src=photo_side height=80 width=80 border=4></a></td></tr>"
 						dat += "<tr><td>ID:</td><td>[active1.fields["id"]]</td></tr>"
-						dat += "<tr><td>Sex:</td><td><A href='?src=[REF(src)];field=sex'>&nbsp;[active1.fields["sex"]]&nbsp;</A></td></tr>"
+						dat += "<tr><td>Gender:</td><td><A href='?src=[REF(src)];field=gender'>&nbsp;[active1.fields["gender"]]&nbsp;</A></td></tr>"
+						dat += "<tr><td>Sex:</td><td><A href='?src=[REF(src)];field=sex'>&nbsp;[active1.fields["sex"]]&nbsp;</A></td></tr>" //NSV13
 						dat += "<tr><td>Age:</td><td><A href='?src=[REF(src)];field=age'>&nbsp;[active1.fields["age"]]&nbsp;</A></td></tr>"
 						dat += "<tr><td>Species:</td><td><A href='?src=[REF(src)];field=species'>&nbsp;[active1.fields["species"]]&nbsp;</A></td></tr>"
 						dat += "<tr><td>Fingerprint:</td><td><A href='?src=[REF(src)];field=fingerprint'>&nbsp;[active1.fields["fingerprint"]]&nbsp;</A></td></tr>"
 						dat += "<tr><td>Physical Status:</td><td><A href='?src=[REF(src)];field=p_stat'>&nbsp;[active1.fields["p_stat"]]&nbsp;</A></td></tr>"
 						dat += "<tr><td>Mental Status:</td><td><A href='?src=[REF(src)];field=m_stat'>&nbsp;[active1.fields["m_stat"]]&nbsp;</A></td></tr>"
+						dat += "<tr><td>General Records:</td><td><A href='?src=[REF(src)];choice=View Past General'>View&nbsp;</A></td></tr>" //NSV13 - Roleplaying Records
 					else
 						dat += "<tr><td>General Record Lost!</td></tr>"
 
 					dat += "<tr><td><br><b><font size='4'>Medical Data</font></b></td></tr>"
 					if(active2 in GLOB.data_core.medical)
+						dat += "<tr><td>Medical Records:</td><td><A href='?src=[REF(src)];choice=View Past Medical'>View&nbsp;</A></td></tr>" //NSV13 - Roleplaying Records
 						dat += "<tr><td>Blood Type:</td><td><A href='?src=[REF(src)];field=blood_type'>&nbsp;[active2.fields["blood_type"]]&nbsp;</A></td></tr>"
 						dat += "<tr><td>DNA:</td><td><A href='?src=[REF(src)];field=b_dna'>&nbsp;[active2.fields["b_dna"]]&nbsp;</A></td></tr>"
 						dat += "<tr><td><br>Minor Disabilities:</td><td><br><A href='?src=[REF(src)];field=mi_dis'>&nbsp;[active2.fields["mi_dis"]]&nbsp;</A></td></tr>"
@@ -195,6 +198,21 @@
 			src.active1 = null
 			src.active2 = null
 		else if(href_list["choice"])
+			//NSV13 - Roleplaying Records - Start
+			if(href_list["choice"] == "View Past Medical")
+				if(istype(active2, /datum/data/record))
+					temp = "<h5>Medical Records:</h5>"
+					temp += "<ul>"
+					temp += "<li>[active2.fields["past_records"]]</li>"
+					temp += "</ul>"
+
+			if(href_list["choice"] == "View Past General")
+				if(istype(active1, /datum/data/record))
+					temp = "<h5>General Records:</h5>"
+					temp += "<ul>"
+					temp += "<li>[active1.fields["past_records"]]</li>"
+					temp += "</ul>"
+			//NSV13 - Roleplaying Records - End
 			// SORTING!
 			if(href_list["choice"] == "Sorting")
 				// Reverse the order if clicked twice
@@ -272,12 +290,19 @@
 							if(!canUseMedicalRecordsConsole(usr, t1, a1))
 								return
 							src.active1.fields["fingerprint"] = t1
+					//NSV13 - Gender Neutrality - Start
 					if("sex")
+						var/t1 = input(usr, "Select sex", "Med. records", src.active1.fields["sex"]) as null|anything in list(MALE, FEMALE, PLURAL)
+						if(!canUseMedicalRecordsConsole(usr, t1, a1))
+							return
+						src.active1.fields["sex"] = capitalize(t1)
+					//NSV13 - Gender Neutrality - Stop
+					if("gender")
 						if(active1)
-							if(src.active1.fields["sex"] == "Male")
-								src.active1.fields["sex"] = "Female"
-							else
-								src.active1.fields["sex"] = "Male"
+							var/t1 = input(usr, "Select gender", "Med. records", src.active1.fields["gender"]) as null|anything in list(MALE, FEMALE, PLURAL)
+							if(!canUseMedicalRecordsConsole(usr, t1, a1))
+								return
+							src.active1.fields["gender"] = capitalize(t1)
 					if("age")
 						if(active1)
 							var/t1 = input("Please input age:", "Med. records", src.active1.fields["age"], null)  as num
@@ -502,25 +527,51 @@
 					GLOB.data_core.medicalPrintCount++
 					playsound(loc, 'sound/items/poster_being_created.ogg', 100, 1)
 					sleep(30)
-					var/obj/item/paper/P = new /obj/item/paper( src.loc )
-					P.info = "<CENTER><B>Medical Record - (MR-[GLOB.data_core.medicalPrintCount])</B></CENTER><BR>"
+					var/obj/item/paper/printed_paper = new /obj/item/paper( src.loc )
+					var/final_paper_text = "<CENTER><B>Medical Record - (MR-[GLOB.data_core.medicalPrintCount])</B></CENTER><BR>"
 					if(active1 in GLOB.data_core.general)
-						P.info += text("Name: [] ID: []<BR>\nSex: []<BR>\nAge: []<BR>", src.active1.fields["name"], src.active1.fields["id"], src.active1.fields["sex"], src.active1.fields["age"])
-						P.info += "\nSpecies: [active1.fields["species"]]<BR>"
-						P.info += text("\nFingerprint: []<BR>\nPhysical Status: []<BR>\nMental Status: []<BR>", src.active1.fields["fingerprint"], src.active1.fields["p_stat"], src.active1.fields["m_stat"])
+						final_paper_text += text("Name: [] ID: []<BR>\nGender: []<BR>\nSex: []<BR>\nAge: []<BR>", src.active1.fields["name"], src.active1.fields["id"], src.active1.fields["gender"], src.active1.fields["sex"], src.active1.fields["age"]) //NSV13
+						final_paper_text += "\nSpecies: [active1.fields["species"]]<BR>"
+						final_paper_text += text("\nFingerprint: []<BR>\nPhysical Status: []<BR>\nMental Status: []<BR>", src.active1.fields["fingerprint"], src.active1.fields["p_stat"], src.active1.fields["m_stat"])
+						//NSV13 - Roleplaying Records - Start
+						if(!(active1.fields["past_records"] == ""))
+							final_paper_text += "\nGeneral Records:\n[active1.fields["past_records"]]\n"
 					else
-						P.info += "<B>General Record Lost!</B><BR>"
+						final_paper_text += "<B>General Record Lost!</B><BR>"
 					if(active2 in GLOB.data_core.medical)
-						P.info += text("<BR>\n<CENTER><B>Medical Data</B></CENTER><BR>\nBlood Type: []<BR>\nDNA: []<BR>\n<BR>\nMinor Disabilities: []<BR>\nDetails: []<BR>\n<BR>\nMajor Disabilities: []<BR>\nDetails: []<BR>\n<BR>\nAllergies: []<BR>\nDetails: []<BR>\n<BR>\nCurrent Diseases: [] (per disease info placed in log/comment section)<BR>\nDetails: []<BR>\n<BR>\nImportant Notes:<BR>\n\t[]<BR>\n<BR>\n<CENTER><B>Comments/Log</B></CENTER><BR>", src.active2.fields["blood_type"], src.active2.fields["b_dna"], src.active2.fields["mi_dis"], src.active2.fields["mi_dis_d"], src.active2.fields["ma_dis"], src.active2.fields["ma_dis_d"], src.active2.fields["alg"], src.active2.fields["alg_d"], src.active2.fields["cdi"], src.active2.fields["cdi_d"], src.active2.fields["notes"])
+						final_paper_text += "<BR>\n<CENTER><B>Medical Data</B></CENTER>"
+						if(!(active2.fields["past_records"] == ""))
+							final_paper_text += "\nMedical Records:\n[active2.fields["past_records"]]<BR>\n"
+						final_paper_text += "<BR>\nBlood Type: [active2.fields["blood_type"]]"
+						final_paper_text += "<BR>\nDNA: [active2.fields["b_dna"]]"
+						final_paper_text += "<BR>\n"
+						final_paper_text += "<BR>\nMinor Disabilities: [active2.fields["mi_dis"]]"
+						final_paper_text += "<BR>\nDetails: [active2.fields["mi_dis_d"]]"
+						final_paper_text += "<BR>\n"
+						final_paper_text += "<BR>\nMajor Disabilities: [active2.fields["ma_dis"]]"
+						final_paper_text += "<BR>\nDetails: [active2.fields["ma_dis_d"]]"
+						final_paper_text += "<BR>\n"
+						final_paper_text += "<BR>\nAllergies: [active2.fields["alg"]]"
+						final_paper_text += "<BR>\nDetails: [active2.fields["alg_d"]]"
+						final_paper_text += "<BR>\n"
+						final_paper_text += "<BR>\nCurrent Diseases: [active2.fields["cdi"]] (per disease info placed in log/comment section)"
+						final_paper_text += "<BR>\nDetails: [active2.fields["cdi_d"]]"
+						final_paper_text += "<BR>\n"
+						final_paper_text += "<BR>\nImportant Notes:"
+						final_paper_text += "<BR>\n\t[active2.fields["notes"]]"
+						final_paper_text += "<BR>\n"
+						//NSV13 - Roleplaying Records - End
 						var/counter = 1
 						while(src.active2.fields[text("com_[]", counter)])
-							P.info += text("[]<BR>", src.active2.fields[text("com_[]", counter)])
+							final_paper_text += text("[]<BR>", src.active2.fields[text("com_[]", counter)])
 							counter++
-						P.name = text("MR-[] '[]'", GLOB.data_core.medicalPrintCount, src.active1.fields["name"])
+						printed_paper.name = text("MR-[] '[]'", GLOB.data_core.medicalPrintCount, src.active1.fields["name"])
 					else
-						P.info += "<B>Medical Record Lost!</B><BR>"
-						P.name = text("MR-[] '[]'", GLOB.data_core.medicalPrintCount, "Record Lost")
-					P.info += "</TT>"
+						final_paper_text += "<B>Medical Record Lost!</B><BR>"
+						printed_paper.name = text("MR-[] '[]'", GLOB.data_core.medicalPrintCount, "Record Lost")
+					final_paper_text += "</TT>"
+					printed_paper.add_raw_text(final_paper_text)
+					printed_paper.update_appearance()
 					src.printing = null
 
 	src.add_fingerprint(usr)
@@ -534,9 +585,9 @@
 			if(prob(10/severity))
 				switch(rand(1,6))
 					if(1)
-						R.fields["name"] = random_unique_name(R.fields["sex"],1)
+						R.fields["name"] = random_unique_name(R.fields["gender"],1)
 					if(2)
-						R.fields["sex"]	= pick("Male", "Female")
+						R.fields["gender"]	= pick("Male", "Female", "Other")
 					if(3)
 						R.fields["age"] = rand(AGE_MIN, AGE_MAX)
 					if(4)

@@ -26,11 +26,11 @@
 /obj/structure/chair/Initialize(mapload)
 	. = ..()
 	if(!anchored)	//why would you put these on the shuttle?
-		addtimer(CALLBACK(src, .proc/RemoveFromLatejoin), 0)
+		addtimer(CALLBACK(src, PROC_REF(RemoveFromLatejoin)), 0)
 
 /obj/structure/chair/ComponentInitialize()
 	. = ..()
-	AddComponent(/datum/component/simple_rotation,ROTATION_ALTCLICK | ROTATION_CLOCKWISE, CALLBACK(src, .proc/can_user_rotate),CALLBACK(src, .proc/can_be_rotated),null)
+	AddComponent(/datum/component/simple_rotation,ROTATION_ALTCLICK | ROTATION_CLOCKWISE, CALLBACK(src, PROC_REF(can_user_rotate)),CALLBACK(src, PROC_REF(can_be_rotated)),null)
 
 /obj/structure/chair/proc/can_be_rotated(mob/user)
 	return TRUE
@@ -231,11 +231,15 @@
 	name = "corporate chair"
 	desc = "It looks professional."
 	icon_state = "comfychair_corp"
+	buildstackamount = 1
+	item_chair = null
 
 /obj/structure/chair/fancy/shuttle
 	name = "shuttle seat"
 	desc = "A comfortable, secure seat. It has a more sturdy looking buckling system for smoother flights."
 	icon_state = "shuttle_chair"
+	buildstackamount = 1
+	item_chair = null
 
 /obj/structure/chair/fancy/plastic
 	name = "plastic chair"
@@ -252,7 +256,7 @@
 	. = ..()
 	anchored = TRUE
 	if(iscarbon(M))
-		INVOKE_ASYNC(src, .proc/snap_check, M)
+		INVOKE_ASYNC(src, PROC_REF(snap_check), M)
 
 /obj/structure/chair/fancy/plastic/post_unbuckle_mob()
 	. = ..()
@@ -333,6 +337,14 @@
 	buildstackamount = 5
 	item_chair = null
 	icon_state = "officechair_dark"
+
+/obj/structure/chair/office/relaymove(mob/user, direction)
+	if(!direction)
+		return FALSE
+	if(direction == dir)
+		return
+	setDir(direction)
+	return FALSE
 
 /obj/structure/chair/office/Moved()
 	. = ..()

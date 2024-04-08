@@ -35,7 +35,7 @@
 /datum/orbital_objective/assassination/generate_objective_stuff(turf/chosen_turf)
 	var/mob/living/carbon/human/created_human = new(chosen_turf)
 	//Maybe polling ghosts would be better than the shintience code
-	created_human.set_playable()
+	created_human.set_playable(ROLE_SURVIVALIST)
 	created_human.mind_initialize()
 	//Remove nearby dangers
 	for(var/mob/living/simple_animal/hostile/SA in range(10, created_human))
@@ -131,7 +131,7 @@
 	glasses = /obj/item/clothing/glasses/chameleon
 	belt = /obj/item/storage/belt/chameleon
 	l_pocket = /obj/item/stamp/chameleon
-	r_pocket = /obj/item/pda/chameleon
+	r_pocket = /obj/item/modular_computer/tablet/pda/chameleon
 	id = /obj/item/card/id/syndicate/anyone
 	neck = /obj/item/clothing/neck/chameleon
 	head = /obj/item/clothing/head/chameleon

@@ -78,9 +78,9 @@
 	contains = list(/obj/item/ship_weapon/ammunition/torpedo/torpedo_casing,
 					/obj/item/ship_weapon/ammunition/torpedo/torpedo_casing,
 					/obj/item/ship_weapon/ammunition/torpedo/torpedo_casing,
-					/obj/item/ship_weapon/parts/missile/warhead,
-					/obj/item/ship_weapon/parts/missile/warhead,
-					/obj/item/ship_weapon/parts/missile/warhead,
+					/obj/item/ship_weapon/parts/missile/warhead/torpedo,
+					/obj/item/ship_weapon/parts/missile/warhead/torpedo,
+					/obj/item/ship_weapon/parts/missile/warhead/torpedo,
 					/obj/item/ship_weapon/parts/missile/guidance_system,
 					/obj/item/ship_weapon/parts/missile/guidance_system,
 					/obj/item/ship_weapon/parts/missile/guidance_system,
@@ -531,6 +531,55 @@
 					/obj/item/gun/energy/laser)
 	crate_name = "laser crate"
 
+/datum/supply_pack/security/mparmor
+	name = "Military Police Replacement Crate"
+	desc = "Three vests of MP armor vests complete with MP undershirts, everything to replace which fire razed to the ground."
+	cost = 3600
+	contains = list(/obj/item/clothing/suit/ship/squad/military_police,
+					/obj/item/clothing/suit/ship/squad/military_police,
+					/obj/item/clothing/suit/ship/squad/military_police,
+					/obj/item/clothing/under/ship/military_police,
+					/obj/item/clothing/under/ship/military_police,
+					/obj/item/clothing/under/ship/military_police,
+					/obj/item/clothing/head/helmet/ship/squad/leader,
+					/obj/item/clothing/head/helmet/ship/squad/leader,
+					/obj/item/clothing/head/helmet/ship/squad/leader)
+	crate_name = "MP armor crate"
+
+/datum/supply_pack/security/armory/m45single
+	name = "M1911 handgun Single-pack"
+	desc = "Single M1911 with a .45 magazine to fit inside of it."
+	cost = 1500
+	contains = list(/obj/item/gun/ballistic/automatic/pistol/m1911/no_mag,
+				/obj/item/ammo_box/magazine/m45)
+	crate_name = "1911 single crate"
+
+/datum/supply_pack/security/armory/m45guns
+	name = "M1911 handgun Crate"
+	desc = "Holds 3 M1911's with 3 magazines to fit in each one of them."
+	cost = 4200
+	contains = list(/obj/item/gun/ballistic/automatic/pistol/m1911/no_mag,
+					/obj/item/gun/ballistic/automatic/pistol/m1911/no_mag,
+					/obj/item/gun/ballistic/automatic/pistol/m1911/no_mag,
+					/obj/item/ammo_box/magazine/m45,
+					/obj/item/ammo_box/magazine/m45,
+					/obj/item/ammo_box/magazine/m45)
+	crate_name = "1911 single gun crate"
+
+/datum/supply_pack/security/armory/m45ammo
+	name = "M1911 Ammo Crate"
+	desc = "Contains 6 magazines and 2 ammoboxes which hold 3 loads each, which should contain enough lead for that holy crusade your chaplain always wanted."
+	cost = 2200
+	contains = list(/obj/item/ammo_box/magazine/m45,
+					/obj/item/ammo_box/magazine/m45,
+					/obj/item/ammo_box/magazine/m45,
+					/obj/item/ammo_box/magazine/m45,
+					/obj/item/ammo_box/magazine/m45,
+					/obj/item/ammo_box/magazine/m45,
+					/obj/item/ammo_box/c45/m45,
+					/obj/item/ammo_box/c45/m45) // yes, they use the C20R ammo, funny KMC
+	crate_name = "1911 ammo crate"
+
 /datum/supply_pack/munitions/fighter_fuel
 	name = "Fighter fuel"
 	desc = "One cryogenic Tyrosene fuel pump, capable of fully refuelling 3 fighters. Handle with care."
@@ -769,11 +818,96 @@
 					/obj/item/reagent_containers/glass/bottle/sacid)
 	crate_name = "Chemical Supply Crate - Chalcogens"
 
-/datum/supply_pack/engineering/plasma_canister //Purely used for the Serendipity's plasma caster
-	name = "Replacement Plasma Canister"
+/datum/supply_pack/medical/robotic_firstaid
+	name = "Synthethic Treatment Kits Crate"
+	desc = "Contains three robotic first aid kits for all of your synthetic repairing needs. Tools, radioactive disinfectant and system cleaner medipens included."
+	contains = list(/obj/item/storage/firstaid/robot,
+					/obj/item/storage/firstaid/robot,
+					/obj/item/storage/firstaid/robot)
+	cost = 1400
+	small_item = TRUE
+	crate_name = "synthethic treatment kits crate"
+
+/datum/supply_pack/materials/plasma_canister //Purely used for the Serendipity's plasma caster
+	name = "Phoron Canister"
 	desc = "A single can of phoron gas, for all your plasma needs!"
 	cost = 2500
 	contains = list(
 		/obj/machinery/portable_atmospherics/canister/toxins)
 	hidden = TRUE
 	crate_name = "Phoron Portable Gas Canister"
+
+//Coffee Related Packs
+/datum/supply_pack/service/coffee_kit
+	name = "Emergency Coffee Resupply Kit"
+	desc = "Did the Marines drink the last of the ship's coffee and are now fertilizing the hydroponic trays? Did the clown destroy your coffee mugs while Runtime knocked the coffee pot onto the floor, making it shatter? Fear not, this crate contains everything you might need to get that liquid ambrosia flowing again!"
+	cost = 1000 //It's a starter pack, so we're not completely greedy, unlike the grill.
+	contains = list(/obj/item/reagent_containers/food/drinks/mug,
+					/obj/item/reagent_containers/food/drinks/mug,
+					/obj/item/reagent_containers/food/drinks/mug,
+					/obj/item/reagent_containers/glass/coffeepot,
+					/obj/item/coffee_cartridge,
+					/obj/item/coffee_cartridge)
+	crate_type = /obj/structure/closet/crate/secure // We don't mess around when it comes to those desperate for coffee.
+	crate_name = "Emergency Coffee Supply Crate"
+
+/datum/supply_pack/service/coffee_cartridge
+	name = "Navy Coffee Cartridge Resupply"
+	desc = "Five cartridges containing our finest navy coffee beans for the glorious coffeemaker."
+	cost = 3000 //Two thousand more than the Emergency kit, because it's a refill.
+	contains = list(/obj/item/coffee_cartridge,
+					/obj/item/coffee_cartridge,
+					/obj/item/coffee_cartridge,
+					/obj/item/coffee_cartridge,
+					/obj/item/coffee_cartridge)
+	crate_type = /obj/structure/closet/crate/secure // We still don't mess around with our coffee supply, this thing is getting to that machine one way or another
+	crate_name = "Coffee Cartridge Supply Crate"
+
+/datum/supply_pack/service/coffee_cartridge_fancy
+	name = "Fancy Garbage Coffee Cartridge Resupply"
+	desc = "We don't know why you would possibly want this garbage tasting coffee compared to the glorious ambrosia taste of Navy Coffee, but here you go. Contains 5 cartridges."
+	cost = 5000 //It's fancy coffee, so it's pretty expensive because the Navy wants to hoard it all from you.
+	contains = list(/obj/item/coffee_cartridge/fancy,
+					/obj/item/coffee_cartridge/fancy,
+					/obj/item/coffee_cartridge/fancy,
+					/obj/item/coffee_cartridge/fancy,
+					/obj/item/coffee_cartridge/fancy)
+	crate_type = /obj/structure/closet/crate/secure
+	crate_name = "Garbage Coffee Supply Crate"
+
+/datum/supply_pack/service/coffeekit
+	name = "Coffee Equippment Crate"
+	desc = "A complete kit to setup your own cozy coffee shop. For some reason, the coffeemaker is not included."
+	cost = 2000
+	contains = list(/obj/item/storage/box/coffeepack/robusta,
+					/obj/item/storage/box/coffeepack/arabica,
+					/obj/item/reagent_containers/glass/coffeepot,
+					/obj/item/storage/fancy/coffee_condi_display,
+					/obj/item/reagent_containers/food/drinks/bottle/cream,
+					/obj/item/reagent_containers/food/condiment/milk,
+					/obj/item/reagent_containers/food/condiment/soymilk,
+					/obj/item/reagent_containers/food/condiment/sugar,
+					/obj/item/reagent_containers/glass/bottle/syrup_bottle/caramel)
+	crate_name = "coffee equpment crate"
+
+/datum/supply_pack/service/coffeemaker
+	name = "Pendulum Coffeemaker Crate"
+	desc = "An assembled Pendulum model coffeemaker."
+	cost = 4000
+	contains = list(/obj/machinery/coffeemaker/pendulum)
+	crate_name = "coffeemaker crate"
+	crate_type = /obj/structure/closet/crate/large
+
+/datum/supply_pack/organic/syrup
+	name = "Coffee Syrups Box"
+	desc = "A packaged box of various syrups, perfect to make your delicious coffee even more diabetic."
+	cost = 3000
+	contains = list(/obj/item/reagent_containers/glass/bottle/syrup_bottle/caramel,
+					/obj/item/reagent_containers/glass/bottle/syrup_bottle/liqueur,
+					/obj/item/reagent_containers/glass/bottle/syrup_bottle/honey,
+					/obj/item/reagent_containers/glass/bottle/syrup_bottle/vanilla,
+					/obj/item/reagent_containers/glass/bottle/syrup_bottle/tea,
+					/obj/item/reagent_containers/glass/bottle/syrup_bottle/creme_de_cacao,
+					/obj/item/reagent_containers/glass/bottle/syrup_bottle/creme_de_menthe)
+	crate_name = "coffee syrups box"
+	crate_type = /obj/structure/closet/cardboard

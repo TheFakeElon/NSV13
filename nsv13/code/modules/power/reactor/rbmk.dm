@@ -239,7 +239,7 @@ The reactor CHEWS through moderator. It does not do this slowly. Be very careful
 	gas_absorption_constant = gas_absorption_effectiveness //And set this up for the rest of the round.
 
 	var/static/list/loc_connections = list(
-		COMSIG_ATOM_ENTERED = .proc/on_entered,
+		COMSIG_ATOM_ENTERED = PROC_REF(on_entered),
 	)
 	AddElement(/datum/element/connect_loc, loc_connections)
 
@@ -575,7 +575,7 @@ The reactor CHEWS through moderator. It does not do this slowly. Be very careful
 
 /obj/machinery/computer/reactor/Initialize(mapload, obj/item/circuitboard/C)
 	. = ..()
-	addtimer(CALLBACK(src, .proc/link_to_reactor), 10 SECONDS)
+	addtimer(CALLBACK(src, PROC_REF(link_to_reactor)), 10 SECONDS)
 
 /obj/machinery/computer/reactor/proc/link_to_reactor()
 	for(var/obj/machinery/atmospherics/components/trinary/nuclear_reactor/asdf in GLOB.machines)
@@ -715,23 +715,15 @@ The reactor CHEWS through moderator. It does not do this slowly. Be very careful
 	var/datum/radio_frequency/radio_connection
 	var/on = FALSE
 
-/obj/machinery/computer/reactor/pump/AltClick(mob/user)
+/obj/machinery/computer/reactor/pump/interact(mob/living/user)
 	. = ..()
-	var/newPressure = input(user, "Set new output pressure (kPa)", "Remote pump control", null) as num
+	var/newPressure = input(user, "Set new output pressure (kPa)", "Remote pump control", null) as null|num
 	if(!newPressure)
 		return
 	newPressure = clamp(newPressure, 0, MAX_OUTPUT_PRESSURE) //Number sanitization is not handled in the pumps themselves, only during their ui_act which this doesn't use.
 	signal(on, newPressure)
 
-/obj/machinery/computer/reactor/attack_robot(mob/user)
-	. = ..()
-	attack_hand(user)
-
-/obj/machinery/computer/reactor/attack_ai(mob/user)
-	. = ..()
-	attack_hand(user)
-
-/obj/machinery/computer/reactor/pump/attack_hand(mob/living/user)
+/obj/machinery/computer/reactor/pump/AltClick(mob/user)
 	. = ..()
 	if(!is_operational)
 		return FALSE
@@ -806,6 +798,7 @@ The reactor CHEWS through moderator. It does not do this slowly. Be very careful
 	network_destination = "rbmk monitoring system"
 	size = 2
 	tgui_id = "NtosRbmkStats"
+	program_icon = "radiation"
 	var/active = TRUE //Easy process throttle
 	var/next_stat_interval = 0
 	var/list/psiData = list()
@@ -851,7 +844,7 @@ The reactor CHEWS through moderator. It does not do this slowly. Be very careful
 		if(tempOutputdata.len > 100) //Only lets you track over a certain timeframe.
 			tempOutputdata.Cut(1, 2)
 
-/datum/computer_file/program/nuclear_monitor/run_program(mob/living/user)
+/datum/computer_file/program/nuclear_monitor/on_start(mob/living/user)
 	. = ..(user)
 	//No reactor? Go find one then.
 	if(!reactor)
@@ -866,7 +859,7 @@ The reactor CHEWS through moderator. It does not do this slowly. Be very careful
 	..()
 
 /datum/computer_file/program/nuclear_monitor/ui_data()
-	var/list/data = get_header_data()
+	var/list/data = list()
 	data["powerData"] = powerData
 	data["psiData"] = psiData
 	data["tempInputData"] = tempInputData

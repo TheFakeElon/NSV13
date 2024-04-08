@@ -24,10 +24,7 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 	var/tip_delay = 500 //tip delay in milliseconds
 
 	//Antag preferences
-	var/list/be_special = list()		//Special role selection
-	var/tmp/old_be_special = 0			//Bitflag version of be_special, used to update old savefiles and nothing more
-										//If it's 0, that's good, if it's anything but 0, the owner of this prefs file's antag choices were,
-										//autocorrected this round, not that you'd need to check that.
+	var/list/role_preferences = list()		//Special role selection
 
 	var/UI_style = null
 	var/outline_color = COLOR_BLUE_GRAY
@@ -44,7 +41,7 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 	var/ghost_accs = GHOST_ACCS_DEFAULT_OPTION
 	var/ghost_others = GHOST_OTHERS_DEFAULT_OPTION
 	var/preferred_map = null
-	var/pda_style = MONO
+	var/pda_theme = THEME_NTOS
 	var/pda_color = "#808000"
 
 	// Custom Keybindings
@@ -77,6 +74,11 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 	var/action_buttons_screen_locs = list()
 	//Nsv13 - Syndicate role select
 	var/preferred_syndie_role = CONQUEST_ROLE_GRUNT
+	//NSV13 - AI Custom Holographic Form - Start
+	var/icon/custom_holoform_icon
+	var/list/cached_holoform_icons
+	var/last_custom_holoform = 0
+	//NSV13 - AI Custom Holographic Form - End
 
 /datum/preferences/proc/set_max_character_slots(newmax)
 	max_usable_slots = min(TRUE_MAX_SAVE_SLOTS, newmax) // Make sure they dont go over
@@ -130,10 +132,12 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 	var/list/dat = list("<center>")
 
 	dat += "<a href='?_src_=prefs;preference=tab;tab=0' [current_tab == 0 ? "class='linkOn'" : ""]>Character Settings</a>"
+	dat += "<a href='?_src_=prefs;preference=tab;tab=4' [current_tab == 4 ? "class='linkOn'" : ""]>Antagonist Preferences</a>"
 	dat += "<a href='?_src_=prefs;preference=tab;tab=1' [current_tab == 1 ? "class='linkOn'" : ""]>Game Preferences</a>"
 	var/shop_name = "[CONFIG_GET(string/metacurrency_name)] Shop"
 	dat += "<a href='?_src_=prefs;preference=tab;tab=2' [current_tab == 2 ? "class='linkOn'" : ""]>[shop_name]</a>"
 	dat += "<a href='?_src_=prefs;preference=tab;tab=3' [current_tab == 3 ? "class='linkOn'" : ""]>OOC Preferences</a>"
+	dat += "<a href='?_src_=prefs;preference=tab;tab=5' [current_tab == 5 ? "class='linkOn'" : ""]>Roleplay Settings</a>" //NSV13 - Roleplay Tab
 
 	dat += "</center>"
 
@@ -175,21 +179,18 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 			dat += "<a href='?_src_=prefs;preference=name;task=input'>[active_character.real_name]</a><BR>"
 
 			if(!(AGENDER in active_character.pref_species.species_traits))
-				dat += "<b>Gender:</b> <a href='?_src_=prefs;preference=gender'>[active_character.gender == MALE ? "Male" : "Female"]</a><BR>"
+				var/dispGender
+				if(active_character.gender == MALE)
+					dispGender = "Male"
+				else if(active_character.gender == FEMALE)
+					dispGender = "Female"
+				else
+					dispGender = "Other"
+				dat += "<b>Gender:</b> <a href='?_src_=prefs;preference=gender'>[dispGender]</a><BR>"
+				dat += "<b>Body Model:</b><a href='?_src_=prefs;preference=body_model'>[active_character.features["body_model"] == MALE ? "Masculine" : "Feminine"]</a><BR>"
 			dat += "<b>Age:</b> <a href='?_src_=prefs;preference=age;task=input'>[active_character.age]</a><BR>"
 
-			//NSV13 FLAVOR TEXT RELATED START
-			dat += "<a href='?_src_=prefs;preference=flavor_text;task=input'><b>Set Flavor Text</b></a>"
-			if(length(active_character.flavor_text) <= 40)
-				if(!length(active_character.flavor_text))
-					dat += "\[...\]"
-				else
-					dat += "[active_character.flavor_text]"
-			else
-				dat += "[copytext_char(active_character.flavor_text, 1, 37)]...<br>"
-
-			dat += "<br><b>Special Names:</b><BR>"
-			//NSV13 FLAVOR TEXT RELATED END
+			dat += "<b>Special Names:</b><BR>"
 			var/old_group
 			for(var/custom_name_id in GLOB.preferences_custom_names)
 				var/namedata = GLOB.preferences_custom_names[custom_name_id]
@@ -227,7 +228,8 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 			dat += "<b>Socks:</b><BR><a href ='?_src_=prefs;preference=socks;task=input'>[active_character.socks]</a><BR>"
 			dat += "<b>Backpack:</b><BR><a href ='?_src_=prefs;preference=bag;task=input'>[active_character.backbag]</a><BR>"
 			dat += "<b>Jumpsuit:</b><BR><a href ='?_src_=prefs;preference=suit;task=input'>[active_character.jumpsuit_style]</a><BR>"
-			dat += "<b>Uplink Spawn Location:</b><BR><a href ='?_src_=prefs;preference=uplink_loc;task=input'>[active_character.uplink_spawn_loc == UPLINK_IMPLANT ? UPLINK_IMPLANT_WITH_PRICE : active_character.uplink_spawn_loc]</a><BR></td>"
+			dat += "<b>Uplink Spawn Location:</b><BR><a href ='?_src_=prefs;preference=uplink_loc;task=input'>[active_character.uplink_spawn_loc == UPLINK_IMPLANT ? UPLINK_IMPLANT_WITH_PRICE : active_character.uplink_spawn_loc]</a><BR>"
+			dat += "<b>Lizard Hiss:</b><BR><a href ='?_src_=prefs;preference=lizard_hiss_style;task=input'>[active_character.lizard_hiss_style]</a><BR></td>" //NSV13
 
 			var/use_skintones = active_character.pref_species.use_skintones
 			if(use_skintones)
@@ -594,7 +596,9 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 
 
 		if (1) // Game Preferences
-			dat += "<table><tr><td width='340px' height='300px' valign='top'>"
+			dat += "<table><tr>"
+			// left box
+			dat += "<td width='340px' height='300px' valign='top'>"
 			dat += "<h2>General Settings</h2>"
 			dat += "<b>UI Style:</b> <a href='?_src_=prefs;task=input;preference=ui'>[UI_style]</a><br>"
 			dat += "<b>Outline:</b> <a href='?_src_=prefs;preference=outline_enabled'>[toggles & PREFTOGGLE_OUTLINE_ENABLED ? "Enabled" : "Disabled"]</a><br>"
@@ -609,8 +613,8 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 			dat += "<b>Action Buttons:</b> <a href='?_src_=prefs;preference=action_buttons'>[(toggles2 & PREFTOGGLE_2_LOCKED_BUTTONS) ? "Locked In Place" : "Unlocked"]</a><br>"
 			dat += "<b>Hotkey Mode:</b> <a href='?_src_=prefs;preference=hotkeys'>[(toggles2 & PREFTOGGLE_2_HOTKEYS) ? "Hotkeys" : "Default"]</a><br>"
 			dat += "<br>"
-			dat += "<b>PDA Color:</b> <span style='border:1px solid #161616; background-color: [pda_color];'>&nbsp;&nbsp;&nbsp;</span> <a href='?_src_=prefs;preference=pda_color;task=input'>Change</a><BR>"
-			dat += "<b>PDA Style:</b> <a href='?_src_=prefs;task=input;preference=pda_style'>[pda_style]</a><br>"
+			dat += "<b>PDA Theme:</b> <a href='?_src_=prefs;task=input;preference=pda_theme'>[theme_name_for_id(pda_theme)]</a><br>"
+			dat += "<b>PDA Classic Color:</b> <span style='border:1px solid #161616; background-color: [pda_color];'>&nbsp;&nbsp;&nbsp;</span> <a href='?_src_=prefs;preference=pda_color;task=input'>Change</a><BR>"
 			dat += "<br>"
 			dat += "<b>Crew Objectives:</b> <a href='?_src_=prefs;preference=crewobj'>[(toggles2 & PREFTOGGLE_2_CREW_OBJECTIVES) ? "Yes" : "No"]</a><br>"
 			dat += "<br>"
@@ -648,8 +652,11 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 			dat += "<br>"
 
 			dat += "<b>Income Updates:</b> <a href='?_src_=prefs;preference=income_pings'>[(chat_toggles & CHAT_BANKCARD) ? "Allowed" : "Muted"]</a><br>"
-			dat += "<br>"
+			dat += "</td>" // left box closed
 
+			// right box
+			dat += "<td width='400px' height='300px' valign='top'>"
+			dat += "<h2>Graphics Settings</h2>"
 			dat += "<b>FPS:</b> <a href='?_src_=prefs;preference=clientfps;task=input'>[clientfps]</a><br>"
 
 			dat += "<b>Parallax (Fancy Space):</b> <a href='?_src_=prefs;preference=parallaxdown' oncontextmenu='window.location.href=\"?_src_=prefs;preference=parallaxup\";return false;'>"
@@ -701,35 +708,98 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 				if(CONFIG_GET(flag/preference_map_voting))
 					dat += "<b>Preferred Map:</b> <a href='?_src_=prefs;preference=preferred_map;task=input'>[p_map]</a><br>"
 
-			dat += "</td><td width='300px' height='300px' valign='top'>"
+			dat += "</td>"
+			// right box closed
 
-			dat += "<h2>Special Role Settings</h2>"
-
-			if(is_banned_from(user.ckey, ROLE_SYNDICATE))
-				dat += "<font color=red><b>You are banned from antagonist roles.</b></font><br>"
-				src.be_special = list()
-
-
-			for (var/i in GLOB.special_roles)
-				if(is_banned_from(user.ckey, i))
-					dat += "<b>Be [capitalize(i)]:</b> <a href='?_src_=prefs;bancheck=[i]'>BANNED</a><br>"
-				else
-					var/days_remaining = null
-					if(ispath(GLOB.special_roles[i]) && CONFIG_GET(flag/use_age_restriction_for_jobs)) //If it's a game mode antag, check if the player meets the minimum age
-						var/mode_path = GLOB.special_roles[i]
-						var/datum/game_mode/temp_mode = new mode_path
-						days_remaining = temp_mode.get_remaining_days(user.client)
-
-					if(days_remaining)
-						dat += "<b>Be [capitalize(i)]:</b> <font color=red> \[IN [days_remaining] DAYS]</font><br>"
-					else
-						dat += "<b>Be [capitalize(i)]:</b> <a href='?_src_=prefs;preference=be_special;be_special_type=[i]'>[(i in be_special) ? "Enabled" : "Disabled"]</a><br>"
-			dat += "<br>"
-			dat += "<b>Midround Antagonist:</b> <a href='?_src_=prefs;preference=allow_midround_antag'>[(toggles & PREFTOGGLE_MIDROUND_ANTAG) ? "Enabled" : "Disabled"]</a><br>"
-
-			dat += "</td></tr><tr><td> </td></tr>" // i hate myself for this
+			dat += "</tr> <tr><td> </td></tr>"
 			dat += "<tr><td colspan='2' width='100%'><center><a style='font-size: 18px;' href='?_src_=prefs;preference=keybindings_menu'>Customize Keybinds</a></center></td></tr>"
 			dat += "</table>"
+
+		if(4) // antagonist preferences window
+			dat += "<center>"
+			var/name
+			var/unspaced_slots = 0
+			for(var/datum/character_save/CS as anything in character_saves)
+				unspaced_slots++
+				if(unspaced_slots > 4)
+					dat += "<br>"
+					unspaced_slots = 0
+				name = CS.real_name
+				if(!name)
+					name = "Character [CS.slot_number]"
+				if(CS.slot_locked)
+					dat += "<a style='white-space:nowrap;' class='linkOff'>[name] (Locked)</a> "
+				else
+					dat += "<a style='white-space:nowrap;' href='?_src_=prefs;preference=changeslot;num=[CS.slot_number];' [CS.slot_number == default_slot ? "class='linkOn'" : ""]>[name]</a> "
+			dat += "</center>"
+			dat += "<table><tr>"
+			// <first left box>
+			dat += "<td width='450px' height='300px' valign='top'>"
+			// --------------------------------------------
+			// warning pannel
+			var/ban_antagonists = is_banned_from(parent.ckey, BAN_ROLE_ALL_ANTAGONISTS)
+			var/ban_forced_antagonists = is_banned_from(parent.ckey, BAN_ROLE_FORCED_ANTAGONISTS)
+			var/ban_ghost = is_banned_from(parent.ckey, BAN_ROLE_ALL_GHOST)
+			if(ban_antagonists || ban_forced_antagonists || ban_ghost)
+				dat += "<h2>Notification</h2>"
+				if(ban_antagonists)
+					dat += "<b>You are banned from all antagonist roles.</b><br> \
+					<a href='?_src_=prefs;bancheck=[BAN_ROLE_ALL_ANTAGONISTS]'><font color='red'>Show Info</font></a><br>"
+				if(ban_forced_antagonists)
+					dat += "<b>You are banned from all forced antagonist roles (such as brainwashing).</b><br> \
+					<a href='?_src_=prefs;bancheck=[BAN_ROLE_FORCED_ANTAGONISTS]'><font color='red'>Show Info</font></a><br>"
+				if(ban_ghost)
+					dat += "<b>You are banned from all non-antagonist ghost roles.</b><br> \
+					<a href='?_src_=prefs;bancheck=[BAN_ROLE_ALL_GHOST]'><font color='red'>Show Info</font></a><br>"
+			// --------------------------------------------
+			//  Antagonist roles
+			dat += "<h3>Antagonists</h3>"
+			for (var/typepath in GLOB.role_preference_entries)
+				var/datum/role_preference/pref = GLOB.role_preference_entries[typepath]
+				if(pref.category != ROLE_PREFERENCE_CATEGORY_ANAGONIST)
+					continue
+				var/ban_key = initial(pref.antag_datum.banning_key)
+				if(is_banned_from(parent.ckey, ban_key))
+					dat += "<b>[pref.name]:</b> <a href='?_src_=prefs;bancheck=[ban_key]'><font color='red'>BANNED</font></a><br>"
+				else
+					dat += "<b>[pref.name]</b> \
+					<br> - Character: <a href='?_src_=prefs;preference=role_preferences;role_preference_type=[typepath]'>[parent.role_preference_enabled(typepath) ? "Enabled" : "Disabled"]</a>\
+					<br> - Global: <a href='?_src_=prefs;preference=role_preferences_enableall;role_preference_type=[typepath]'>Enable</a>\
+					<a href='?_src_=prefs;preference=role_preferences_disableall;role_preference_type=[typepath]'>Disable</a><br>"
+			dat += "</td>"
+			// left box closed
+
+			// <secont right box>
+			// --------------------------------------------
+			// Midround antagonists + ghostspawn roles
+			dat += "<td width='400px' valign='top'>"
+			dat += "<h3>Midrounds (Living)</h3>"
+			for (var/typepath in GLOB.role_preference_entries)
+				var/datum/role_preference/pref = GLOB.role_preference_entries[typepath]
+				if(pref.category != ROLE_PREFERENCE_CATEGORY_MIDROUND_LIVING)
+					continue
+				var/ban_key = initial(pref.antag_datum.banning_key)
+				if(is_banned_from(parent.ckey, ban_key))
+					dat += "<b>[pref.name]:</b> <a href='?_src_=prefs;bancheck=[ban_key]'><font color='red'>BANNED</font></a><br>"
+				else
+					dat += "<b>[pref.name]</b> \
+					<br> - Character: <a href='?_src_=prefs;preference=role_preferences;role_preference_type=[typepath]'>[parent.role_preference_enabled(typepath) ? "Enabled" : "Disabled"]</a>\
+					<br> - Global: <a href='?_src_=prefs;preference=role_preferences_enableall;role_preference_type=[typepath]'>Enable</a>\
+					<a href='?_src_=prefs;preference=role_preferences_disableall;role_preference_type=[typepath]'>Disable</a><br>"
+			dat += "<h3>Midrounds (Ghost)</h3>"
+			for (var/typepath in GLOB.role_preference_entries)
+				var/datum/role_preference/pref = GLOB.role_preference_entries[typepath]
+				if(pref.category != ROLE_PREFERENCE_CATEGORY_MIDROUND_GHOST)
+					continue
+				var/ban_key = initial(pref.antag_datum.banning_key)
+				if(is_banned_from(parent.ckey, ban_key))
+					dat += "<b>[pref.name]:</b> <a href='?_src_=prefs;bancheck=[ban_key]'><font color='red'>BANNED</font></a><br>"
+				else
+					dat += "<b>[pref.name]:</b> <a href='?_src_=prefs;preference=role_preferences;role_preference_type=[typepath]'>[parent.role_preference_enabled(typepath) ? "Enabled" : "Disabled"]</a><br>"
+			dat += "</td>"
+			// right box closed
+
+			dat += "</tr></table>"
 
 		if(2) //Loadout
 			var/list/type_blacklist = list()
@@ -886,6 +956,96 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 				dat += "</td>"
 			dat += "</tr></table>"
 
+		if(5)
+			dat += "<a href='?_src_=prefs;preference=tab;tab=0' [current_tab == 0 ? "class='linkOn'" : ""]>Character Settings</a>" //NSV13 - Roleplay Tab - Start
+			dat += "<center>"
+			var/name
+			var/unspaced_slots = 0
+			for(var/datum/character_save/CS as anything in character_saves)
+				unspaced_slots++
+				if(unspaced_slots > 4)
+					dat += "<br>"
+					unspaced_slots = 0
+				name = CS.real_name
+				if(!name)
+					name = "Character [CS.slot_number]"
+				if(CS.slot_locked)
+					dat += "<a style='white-space:nowrap;' class='linkOff'>[name] (Locked)</a> "
+				else
+					dat += "<a style='white-space:nowrap;' href='?_src_=prefs;preference=changeslot;num=[CS.slot_number];' [CS.slot_number == default_slot ? "class='linkOn'" : ""]>[name]</a> "
+			dat += "</center>"
+
+			dat += "<h2>Flavor Text</h2>"
+			dat += "<table width='100%'><tr><td width='75%' valign='top'>"
+
+			dat += "<a href='?_src_=prefs;preference=flavor_text;task=input'><b>Set Flavor Text</b></a><br>"
+			if(length(active_character.flavor_text) <= 40)
+				if(!length(active_character.flavor_text))
+					dat += "\[...\]"
+				else
+					dat += "[active_character.flavor_text]"
+			else
+				dat += "[copytext_char(active_character.flavor_text, 1, 40)]...<br>"
+
+			dat += "<br>"
+
+			dat += "<a href='?_src_=prefs;preference=silicon_flavor_text;task=input'><b>Set Silicon Examine Text</b></a><br>"
+			if(length(active_character.silicon_flavor_text) <= 40)
+				if(!length(active_character.silicon_flavor_text))
+					dat += "\[...\]"
+				else
+					dat += "[active_character.silicon_flavor_text]"
+			else
+				dat += "[copytext_char(active_character.silicon_flavor_text, 1, 40)]...<br>"
+
+			dat += "</tr></table>"
+
+			dat += "<table width='100%'><tr>"
+			dat += "<td width='33%'>"
+
+			dat += "<h2>General Record</h2>"
+			dat += "<a href='?_src_=prefs;preference=general_record;task=input'><b>Set General Record</b></a><br>"
+
+			if(length(active_character.general_record) <= 40)
+				if(!length(active_character.general_record))
+					dat += "\[...\]"
+				else
+					dat += "[html_encode(active_character.general_record)]"
+			else
+				dat += "[copytext_char(active_character.general_record, 1, 40)]..."
+
+			dat += "<br>"
+
+
+			dat += "<h2>Medical Record</h2>"
+			dat += "<a href='?_src_=prefs;preference=medical_record;task=input'><b>Set Medical Record</b></a><br>"
+
+			if(length(active_character.medical_record) <= 40)
+				if(!length(active_character.medical_record))
+					dat += "\[...\]"
+				else
+					dat += "[html_encode(active_character.medical_record)]"
+			else
+				dat += "[copytext_char(active_character.medical_record, 1, 40)]..."
+
+			dat += "<br>"
+
+
+			dat += "<h2>Security Record</h2>"
+			dat += "<a href='?_src_=prefs;preference=security_record;task=input'><b>Set Security Record</b></a><br>"
+
+			if(length(active_character.security_record) <= 40)
+				if(!length(active_character.security_record))
+					dat += "\[...\]"
+				else
+					dat += "[html_encode(active_character.security_record)]"
+			else
+				dat += "[copytext_char(active_character.security_record, 1, 40)]..."
+
+			dat += "<br>"
+			dat += "</td>"
+			dat += "</tr></table>"
+		//NSV13 - Roleplay Tab - End
 	dat += "<hr><center>"
 
 	if(!IS_GUEST_KEY(user.key))
@@ -934,7 +1094,7 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 
 		var/datum/job/overflow = SSjob.GetJob(SSjob.overflow_role)
 
-		for(var/datum/job/job in sortList(SSjob.occupations, /proc/cmp_job_display_asc))
+		for(var/datum/job/job in sortList(SSjob.occupations, GLOBAL_PROC_REF(cmp_job_display_asc)))
 			if(job.gimmick) //Gimmick jobs run off of a single pref
 				continue
 			index += 1
@@ -1461,11 +1621,7 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 					if(new_hair)
 						active_character.hair_color = sanitize_hexcolor(new_hair)
 				if("hair_style")
-					var/new_hair_style
-					if(active_character.gender == MALE)
-						new_hair_style = input(user, "Choose your character's hair style:", "Character Preference")  as null|anything in GLOB.hair_styles_male_list
-					else
-						new_hair_style = input(user, "Choose your character's hair style:", "Character Preference")  as null|anything in GLOB.hair_styles_female_list
+					var/new_hair_style = input(user, "Choose your character's hair style:", "Character Preference")  as null|anything in GLOB.hair_styles_list
 					if(new_hair_style)
 						active_character.hair_style = new_hair_style
 
@@ -1481,16 +1637,10 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 						active_character.gradient_color = sanitize_hexcolor(new_hair_gradient)
 
 				if("next_hair_style")
-					if(active_character.gender == MALE)
-						active_character.hair_style = next_list_item(active_character.hair_style, GLOB.hair_styles_male_list)
-					else
-						active_character.hair_style = next_list_item(active_character.hair_style, GLOB.hair_styles_female_list)
+					active_character.hair_style = next_list_item(active_character.hair_style, GLOB.hair_styles_list)
 
 				if("previous_hair_style")
-					if(active_character.gender == MALE)
-						active_character.hair_style = previous_list_item(active_character.hair_style, GLOB.hair_styles_male_list)
-					else
-						active_character.hair_style = previous_list_item(active_character.hair_style, GLOB.hair_styles_female_list)
+					active_character.hair_style = previous_list_item(active_character.hair_style, GLOB.hair_styles_list)
 
 				if("next_gradient_style")
 					active_character.gradient_style = next_list_item(active_character.gradient_style, GLOB.hair_gradients_list)
@@ -1504,32 +1654,18 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 						active_character.facial_hair_color = sanitize_hexcolor(new_facial)
 
 				if("facial_hair_style")
-					var/new_facial_hair_style
-					if(active_character.gender == MALE)
-						new_facial_hair_style = input(user, "Choose your character's facial-hair style:", "Character Preference")  as null|anything in GLOB.facial_hair_styles_male_list
-					else
-						new_facial_hair_style = input(user, "Choose your character's facial-hair style:", "Character Preference")  as null|anything in GLOB.facial_hair_styles_female_list
+					var/new_facial_hair_style = input(user, "Choose your character's facial-hair style:", "Character Preference")  as null|anything in GLOB.facial_hair_styles_list
 					if(new_facial_hair_style)
 						active_character.facial_hair_style = new_facial_hair_style
 
 				if("next_facehair_style")
-					if (active_character.gender == MALE)
-						active_character.facial_hair_style = next_list_item(active_character.facial_hair_style, GLOB.facial_hair_styles_male_list)
-					else
-						active_character.facial_hair_style = next_list_item(active_character.facial_hair_style, GLOB.facial_hair_styles_female_list)
+					active_character.facial_hair_style = next_list_item(active_character.facial_hair_style, GLOB.facial_hair_styles_list)
 
 				if("previous_facehair_style")
-					if (active_character.gender == MALE)
-						active_character.facial_hair_style = previous_list_item(active_character.facial_hair_style, GLOB.facial_hair_styles_male_list)
-					else
-						active_character.facial_hair_style = previous_list_item(active_character.facial_hair_style, GLOB.facial_hair_styles_female_list)
+					active_character.facial_hair_style = previous_list_item(active_character.facial_hair_style, GLOB.facial_hair_styles_list)
 
 				if("underwear")
-					var/new_underwear
-					if(active_character.gender == MALE)
-						new_underwear = input(user, "Choose your character's underwear:", "Character Preference")  as null|anything in GLOB.underwear_m
-					else
-						new_underwear = input(user, "Choose your character's underwear:", "Character Preference")  as null|anything in GLOB.underwear_f
+					var/new_underwear = input(user, "Choose your character's underwear:", "Character Preference")  as null|anything in GLOB.underwear_list
 					if(new_underwear)
 						active_character.underwear = new_underwear
 
@@ -1539,11 +1675,7 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 						active_character.underwear_color = sanitize_hexcolor(new_underwear_color)
 
 				if("undershirt")
-					var/new_undershirt
-					if(active_character.gender == MALE)
-						new_undershirt = input(user, "Choose your character's undershirt:", "Character Preference") as null|anything in GLOB.undershirt_m
-					else
-						new_undershirt = input(user, "Choose your character's undershirt:", "Character Preference") as null|anything in GLOB.undershirt_f
+					var/new_undershirt = input(user, "Choose your character's undershirt:", "Character Preference") as null|anything in GLOB.undershirt_list
 					if(new_undershirt)
 						active_character.undershirt = new_undershirt
 
@@ -1799,12 +1931,38 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 				if("syndiecrew")
 					var/client/C = (istype(user, /client)) ? user : user.client
 					C.select_syndie_role()
-
+				//NSV13 - Roleplay Stuff
 				if("flavor_text")
-					var/msg = capped_multiline_input(usr, "Set the flavor text for your 'examine' verb.\nThe rules are the following;\nNo Memes.\nNothing that people can't see at a glance.\nNothing that's Out Of Character.\nNothing that breaks the game.", "Flavor Text", active_character.flavor_text)
+					var/msg = input(usr, "Set the flavor text for your 'examine' verb.\nThe rules are the following;\nNo Memes.\nNothing that people can't see at a glance.\nNothing that's Out Of Character.\nNothing that breaks the game.", "Flavor Text", active_character.flavor_text) as message|null
 					if(msg)
-						active_character.flavor_text = html_decode(strip_html(msg))
-				//NSV13 end
+						active_character.flavor_text = html_decode(strip_html_simple(msg))
+				if("lizard_hiss_style")
+					if(active_character.lizard_hiss_style == LIZARD_HISS_EXPANDED)
+						active_character.lizard_hiss_style = LIZARD_HISS_LEGACY
+					else
+						active_character.lizard_hiss_style = LIZARD_HISS_EXPANDED
+
+				if("silicon_flavor_text")
+					var/msg = input(usr, "Set the flavor text in your 'examine' verb. This is for describing what people can tell by looking at your character.", "Silicon Flavor Text", active_character.silicon_flavor_text) as message|null
+					if(!isnull(msg))
+						active_character.silicon_flavor_text = html_decode(strip_html_simple(msg))
+
+				if("general_record")
+					var/msg = input(usr, "Set your general record. This is more or less public information, available from security, medical and command consoles", "General Record", active_character.general_record) as message|null
+					if(!isnull(msg))
+						active_character.general_record = html_decode(strip_html_simple(msg))
+
+				if("medical_record")
+					var/msg = input(usr, "Set your medical record. ", "Medical Record", active_character.medical_record) as message|null
+					if(!isnull(msg))
+						active_character.medical_record = html_decode(strip_html_simple(msg))
+
+				if("security_record")
+					var/msg = input(usr, "Set your security record. ", "Medical Record", active_character.security_record) as message|null
+					if(!isnull(msg))
+						active_character.security_record = html_decode(strip_html_simple(msg))
+
+				//NSV13 - END
 				if ("preferred_map")
 					var/maplist = list()
 					var/default = "Default"
@@ -1834,12 +1992,12 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 						UI_style = pickedui
 						if (parent && parent.mob && parent.mob.hud_used)
 							parent.mob.hud_used.update_ui_style(ui_style2icon(UI_style))
-				if("pda_style")
-					var/pickedPDAStyle = input(user, "Choose your PDA style.", "Character Preference", pda_style)  as null|anything in GLOB.pda_styles
+				if("pda_theme")
+					var/pickedPDAStyle = input(user, "Choose your default PDA theme.", "Character Preference", pda_theme)  as null|anything in GLOB.ntos_device_themes_default
 					if(pickedPDAStyle)
-						pda_style = pickedPDAStyle
+						pda_theme = GLOB.ntos_device_themes_default[pickedPDAStyle]
 				if("pda_color")
-					var/pickedPDAColor = input(user, "Choose your PDA Interface color.", "Character Preference", pda_color) as color|null
+					var/pickedPDAColor = input(user, "Choose your default Thinktronic Classic theme background color.", "Character Preference", pda_color) as color|null
 					if(pickedPDAColor)
 						pda_color = pickedPDAColor
 				if ("see_balloon_alerts")
@@ -1853,16 +2011,17 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 					if(unlock_content)
 						toggles ^= PREFTOGGLE_MEMBER_PUBLIC
 				if("gender")
-					if(active_character.gender == MALE)
-						active_character.gender = FEMALE
-					else
-						active_character.gender = MALE
-					active_character.underwear = random_underwear(active_character.gender)
-					active_character.undershirt = random_undershirt(active_character.gender)
-					active_character.socks = random_socks()
-					active_character.facial_hair_style = random_facial_hair_style(active_character.gender)
-					active_character.hair_style = random_hair_style(active_character.gender)
-
+					var/list/friendlyGenders = list("Male" = "male", "Female" = "female", "Other" = "plural")
+					var/pickedGender = input(user, "Choose your gender.", "Character Preference", active_character.gender) as null|anything in friendlyGenders
+					if(pickedGender && friendlyGenders[pickedGender] != active_character.gender)
+						switch(friendlyGenders[pickedGender])
+							if("plural")
+								active_character.features["body_model"] = pick(MALE, FEMALE)
+							else
+								active_character.features["body_model"] = friendlyGenders[pickedGender]
+						active_character.gender = friendlyGenders[pickedGender]
+				if("body_model")
+					active_character.features["body_model"] = active_character.features["body_model"] == MALE ? FEMALE : MALE
 				if("hotkeys")
 					toggles2 ^= PREFTOGGLE_2_HOTKEYS
 					if(toggles2 & PREFTOGGLE_2_HOTKEYS)
@@ -1913,12 +2072,33 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 					toggles ^= PREFTOGGLE_DEADMIN_POSITION_SILICON
 
 
-				if("be_special")
-					var/be_special_type = href_list["be_special_type"]
-					if(be_special_type in be_special)
-						be_special -= be_special_type
-					else
-						be_special += be_special_type
+				if("role_preferences")
+					var/role_preference_type = href_list["role_preference_type"]
+					var/role_preference_path = text2path(role_preference_type)
+					var/datum/role_preference/role_pref = GLOB.role_preference_entries[role_preference_path]
+					if(istype(role_pref))
+						var/list/prefsource = role_pref.per_character ? active_character.role_preferences_character : role_preferences
+						var/current = prefsource["[role_preference_type]"]
+						if(isnum(current))
+							prefsource["[role_preference_type]"] = !current
+						else // not set, we assume it's on, so turn it off.
+							prefsource["[role_preference_type]"] = FALSE
+
+				if("role_preferences_enableall")
+					var/role_preference_type = href_list["role_preference_type"]
+					var/role_preference_path = text2path(role_preference_type)
+					var/datum/role_preference/role_pref = GLOB.role_preference_entries[role_preference_path]
+					if(istype(role_pref) && role_pref.per_character)
+						for(var/datum/character_save/CS in character_saves)
+							CS.role_preferences_character["[role_preference_type]"] = TRUE
+
+				if("role_preferences_disableall")
+					var/role_preference_type = href_list["role_preference_type"]
+					var/role_preference_path = text2path(role_preference_type)
+					var/datum/role_preference/role_pref = GLOB.role_preference_entries[role_preference_path]
+					if(istype(role_pref) && role_pref.per_character)
+						for(var/datum/character_save/CS in character_saves)
+							CS.role_preferences_character["[role_preference_type]"] = FALSE
 
 				if("name")
 					active_character.be_random_name = !active_character.be_random_name
@@ -1959,9 +2139,6 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 
 				if("pull_requests")
 					chat_toggles ^= CHAT_PULLR
-
-				if("allow_midround_antag")
-					toggles ^= PREFTOGGLE_MIDROUND_ANTAG
 
 				if("parallaxup")
 					parallax = WRAP(parallax + 1, PARALLAX_INSANE, PARALLAX_DISABLE + 1)
@@ -2155,3 +2332,12 @@ GLOBAL_LIST_EMPTY(preferences_datums)
 			active_character.equipped_gear -= RG.id
 			purchased_gear -= RG.id
 		save_preferences()
+
+//NSV13 - AI Custom Holographic Form
+/datum/preferences/proc/get_filtered_holoform(filter_type)
+	if(!custom_holoform_icon)
+		return
+	LAZYINITLIST(cached_holoform_icons)
+	if(!cached_holoform_icons[filter_type])
+		cached_holoform_icons[filter_type] = process_holoform_icon_filter(custom_holoform_icon, filter_type)
+	return cached_holoform_icons[filter_type]

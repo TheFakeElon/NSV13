@@ -196,6 +196,7 @@
 
 /obj/structure/overmap/nanotrasen/patrol_cruiser/starter //Currently assigned to the Snake
 	role = MAIN_OVERMAP
+	obj_integrity = 1000
 	max_integrity = 1000
 	integrity_failure = 1000
 	bound_width = 64
@@ -221,7 +222,6 @@
 	weapon_types[FIRE_MODE_AMS] = new /datum/ship_weapon/vls(src)
 	weapon_types[FIRE_MODE_GAUSS] = new /datum/ship_weapon/gauss(src)
 	weapon_types[FIRE_MODE_PDC] = new /datum/ship_weapon/pdc_mount(src)
-	weapon_types[FIRE_MODE_MISSILE] = new /datum/ship_weapon/missile_launcher(src)
 	weapon_types[FIRE_MODE_BROADSIDE] = new /datum/ship_weapon/broadside(src)
 
 /obj/structure/overmap/nanotrasen/carrier/starter //NOT CURRENTLY ASSIGNED

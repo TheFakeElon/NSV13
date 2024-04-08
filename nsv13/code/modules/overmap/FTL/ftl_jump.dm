@@ -1,13 +1,17 @@
 /datum/star_system/proc/add_ship(obj/structure/overmap/OM, turf/target_turf)
 	if(!system_contents.Find(OM))
 		system_contents += OM	//Lets be safe while I cast some black magic.
+	var/did_restore_system = FALSE
 	if(!occupying_z && OM.z) //Does this system have a physical existence? if not, we'll set this now so that any inbound ships jump to the same Z-level that we're on.
 		if(!SSmapping.level_trait(OM.z, ZTRAIT_OVERMAP))
 			occupying_z = OM.get_reserved_z()
 		else
 			occupying_z = OM.z
-		if(OM.role == MAIN_OVERMAP) //As these events all happen to the main ship, let's check that it's not say, the nomi that's triggering this system load...
-			try_spawn_event()
+		did_restore_system = TRUE
+	else if(!occupying_z && ((OM.overmap_flags & OVERMAP_FLAG_ZLEVEL_CARRIER) || length(OM.mobs_in_ship))) //If someone is inside, or we always want it loaded, load it.
+		occupying_z = OM.get_reserved_z()
+		did_restore_system = TRUE
+	if(did_restore_system)
 		if(fleets.len)
 			for(var/datum/fleet/F in fleets)
 				if(!F.current_system)
@@ -56,16 +60,6 @@
 		if(length(F.audio_cues) && F.alignment != OM.faction && !F.federation_check(OM))
 			return TRUE
 	OM.play_music(pick(audio_cues))
-
-/datum/star_system/proc/try_spawn_event()
-	if(possible_events && prob(event_chance))
-		if(!length(possible_events))
-			return FALSE
-		var/event_type = pick(possible_events)
-		for(var/datum/round_event_control/E in SSevents.control)
-			if(istype(E, event_type))
-				SSevents.TriggerEvent(E)
-				break
 
 /datum/star_system/proc/restore_contents()
 	if(enemy_queue)
@@ -156,33 +150,38 @@
 /obj/structure/overmap/proc/begin_jump(datum/star_system/target_system, force=FALSE)
 	relay(ftl_drive.ftl_start, channel = CHANNEL_IMPORTANT_SHIP_ALERT)
 	desired_angle = 90 //90 degrees AKA face EAST to match the FTL parallax.
-	addtimer(CALLBACK(src, .proc/jump_start, target_system, force), ftl_drive.ftl_startup_time)
+	addtimer(CALLBACK(src, PROC_REF(jump_start), target_system, force), ftl_drive.ftl_startup_time)
 
-/obj/structure/overmap/proc/force_return_jump(datum/star_system/target_system)
+/obj/structure/overmap/proc/force_return_jump()
+	SIGNAL_HANDLER
+	var/datum/star_system/target_system = SSstar_system.return_system
 	SSovermap_mode.already_ended = TRUE
-	if(ftl_drive) //Do we actually have an ftl drive?
+	if(ftl_drive && target_system) //Do we actually have an ftl drive?
 		ftl_drive.lockout = TRUE //Prevent further jumps
 		if(ftl_drive.ftl_state == FTL_STATE_JUMPING)
-			addtimer(CALLBACK(src, .proc/force_return_jump, target_system), 30 SECONDS)
-			message_admins("[src] is already jumping, delaying recall for 30 seconds")
-			log_runtime("DEBUG: force_return_jump: Players were already jumping, trying again in 30 seconds")
+			RegisterSignal(src, COMSIG_SHIP_ARRIVED, PROC_REF(force_return_jump))
+			message_admins("[src] is already jumping, delaying recall")
+			log_game("DEBUG: force_return_jump: Players were already jumping, trying again when jump is complete")
 		else
-			target_system.hidden = FALSE //Reveal where we are going
-
-			log_runtime("DEBUG: force_return_jump: Beginning jump to outpost 45")
+			SSstar_system.return_system.hidden = FALSE //Reveal where we are going
+			UnregisterSignal(src, COMSIG_SHIP_ARRIVED)
+			log_game("DEBUG: force_return_jump: Beginning jump to [target_system.name]")
 			ftl_drive.force_jump(target_system) //Jump home
-			addtimer(CALLBACK(src, .proc/check_return_jump), SSstar_system.ships[src]["to_time"] + 35 SECONDS)
+			addtimer(CALLBACK(src, PROC_REF(check_return_jump)), SSstar_system.ships[src]["to_time"] + 35 SECONDS)
 
+	else if(target_system)
+		message_admins("Failed to force return jump! [src] does not have an FTL Drive!")
+		log_runtime("DEBUG: force_return_jump: [src] had no FTL drive")
 	else
-		message_admins("Target does not have an FTL Drive!")
-		log_runtime("DEBUG: force_return_jump: Ship had no FTL drive")
+		message_admins("Failed to force return jump! No target system was found! (Tell a coder)")
+		log_runtime("DEBUG: force_return_jump: No target system")
 
 /obj/structure/overmap/proc/check_return_jump()
-	log_runtime("DEBUG: check_return_jump called")
-	var/datum/star_system/S = SSstar_system.system_by_id("Outpost 45")
+	log_game("DEBUG: check_return_jump called")
+	var/datum/star_system/S = SSstar_system.return_system
 	if(current_system != S && SSstar_system.ships[src]["target_system"] != S) // Not in 45 and not on our way there
 		log_runtime("DEBUG: check_return_jump detected bad state, trying to force_return_jump")
-		force_return_jump(S)
+		force_return_jump()
 
 
 /obj/structure/overmap/proc/force_parallax_update(ftl_start)
@@ -203,19 +202,17 @@
 
 /obj/structure/overmap/proc/jump_start(datum/star_system/target_system, force=FALSE)
 	if(ftl_drive?.ftl_state != FTL_STATE_JUMPING)
-		if(force)
+		if(force && ftl_drive)
 			ftl_drive.ftl_state = FTL_STATE_JUMPING
 		else
 			log_runtime("DEBUG: jump_start: aborted jump to [target_system], drive state = [ftl_drive?.ftl_state]")
 			return
 	if((SEND_GLOBAL_SIGNAL(COMSIG_GLOB_CHECK_INTERDICT, src) & BEING_INTERDICTED) && !force) // Override interdiction if the game is over
-		ftl_drive?.radio.talk_into(ftl_drive, "Warning. Local energy anomaly detected - calculated jump parameters invalid. Performing emergency reboot.", ftl_drive.radio_channel)
+		ftl_drive.radio.talk_into(ftl_drive, "Warning. Local energy anomaly detected - calculated jump parameters invalid. Performing emergency reboot.", ftl_drive.radio_channel)
 		relay('sound/magic/lightning_chargeup.ogg', channel=CHANNEL_IMPORTANT_SHIP_ALERT)
-		ftl_drive?.depower()
-		log_runtime("DEBUG: jump_start: aborted jump to [target_system] due to interdiction")
+		ftl_drive.depower()
 		return
 
-	log_runtime("DEBUG: jump_start: jump to [target_system] passed initial checks")
 	relay_to_nearby('nsv13/sound/effects/ship/FTL.ogg', null, ignore_self=TRUE)//Ships just hear a small "crack" when another one jumps
 	if(reserved_z) //Actual overmap parallax behaviour
 		var/datum/space_level/SL = SSmapping.z_list[reserved_z]
@@ -225,10 +222,12 @@
 
 	relay(ftl_drive.ftl_loop, "<span class='warning'>You feel the ship lurch forward</span>", loop=TRUE, channel = CHANNEL_SHIP_ALERT)
 	var/datum/star_system/curr = SSstar_system.ships[src]["current_system"]
-	log_runtime("DEBUG: jump_start: starting jump to [target_system] from [curr]")
 	SEND_SIGNAL(src, COMSIG_SHIP_DEPARTED) // Let missions know we have left the system
 	curr.remove_ship(src)
-	var/speed = (curr.dist(target_system) / (ftl_drive.get_jump_speed() * 10)) //TODO: FTL drive speed upgrades.
+	var/drive_speed = ftl_drive.get_jump_speed()
+	if(drive_speed <= 0) //Assumption: If we got into this proc with speed 0, we want it to jump anyways, as it should be caught before otherwise. Using very slow speed in this case.
+		drive_speed = 1 //Div-by-0s are not fun.
+	var/speed = (curr.dist(target_system) / (drive_speed * 10)) //TODO: FTL drive speed upgrades.
 	SSstar_system.ships[src]["to_time"] = world.time + speed MINUTES
 	SEND_SIGNAL(src, COMSIG_FTL_STATE_CHANGE)
 	if(role == MAIN_OVERMAP) //Scuffed please fix
@@ -242,7 +241,7 @@
 	SSstar_system.ships[src]["target_system"] = target_system
 	SSstar_system.ships[src]["from_time"] = world.time
 	SSstar_system.ships[src]["current_system"] = null
-	addtimer(CALLBACK(src, .proc/jump_end, target_system), speed MINUTES)
+	addtimer(CALLBACK(src, PROC_REF(jump_end), target_system), speed MINUTES)
 	ftl_drive.depower(ftl_drive.auto_spool_enabled)
 	jump_handle_shake()
 	force_parallax_update(TRUE)

@@ -58,6 +58,8 @@
 
 /obj/machinery/door/Initialize(mapload)
 	. = ..()
+	if(!density)//NSV make it so prevent_click_under doesn't need density
+		flags_1 &= ~PREVENT_CLICK_UNDER_1
 	set_init_door_layer()
 	update_freelook_sight()
 	air_update_turf(1)
@@ -69,7 +71,7 @@
 	real_explosion_block = explosion_block
 	explosion_block = EXPLOSION_BLOCK_PROC
 	if(red_alert_access)
-		RegisterSignal(SSdcs, COMSIG_GLOB_SECURITY_ALERT_CHANGE, .proc/handle_alert)
+		RegisterSignal(SSdcs, COMSIG_GLOB_SECURITY_ALERT_CHANGE, PROC_REF(handle_alert))
 
 /obj/machinery/door/proc/handle_alert(datum/source, new_alert)
 	SIGNAL_HANDLER
@@ -219,6 +221,7 @@
 	var/max_moles = min_moles
 	// okay this is a bit hacky. First, we set density to 0 and recalculate our adjacent turfs
 	density = FALSE
+	flags_1 &= ~PREVENT_CLICK_UNDER_1//NSV make it so prevent_click_under doesn't need density
 	T.ImmediateCalculateAdjacentTurfs()
 	// then we use those adjacent turfs to figure out what the difference between the lowest and highest pressures we'd be holding is
 	for(var/turf/open/T2 in T.atmos_adjacent_turfs)
@@ -230,6 +233,8 @@
 		if(moles > max_moles)
 			max_moles = moles
 	density = TRUE
+	if(!(flags_1 & ON_BORDER_1))//NSV but not border firelocks
+		flags_1 |= PREVENT_CLICK_UNDER_1//NSV make it so prevent_click_under doesn't need density
 	T.ImmediateCalculateAdjacentTurfs() // alright lets put it back
 	return max_moles - min_moles > 20
 
@@ -268,12 +273,12 @@
 	if (. & EMP_PROTECT_SELF)
 		return
 	if(prob(20/severity) && (istype(src, /obj/machinery/door/airlock) || istype(src, /obj/machinery/door/window)) )
-		INVOKE_ASYNC(src, .proc/open)
+		INVOKE_ASYNC(src, PROC_REF(open))
 	if(prob(severity*10 - 20))
 		if(secondsElectrified == MACHINE_NOT_ELECTRIFIED)
 			secondsElectrified = MACHINE_ELECTRIFIED_PERMANENT
 			LAZYADD(shockedby, "\[[time_stamp()]\]EM Pulse")
-			addtimer(CALLBACK(src, .proc/unelectrify), 300)
+			addtimer(CALLBACK(src, PROC_REF(unelectrify)), 300)
 
 /obj/machinery/door/proc/unelectrify()
 	secondsElectrified = MACHINE_NOT_ELECTRIFIED
@@ -311,6 +316,7 @@
 	set_opacity(0)
 	sleep(open_speed)
 	density = FALSE
+	flags_1 &= ~PREVENT_CLICK_UNDER_1//NSV make it so prevent_click_under doesn't need density
 	sleep(open_speed)
 	layer = initial(layer)
 	update_icon()
@@ -341,8 +347,12 @@
 	layer = closingLayer
 	if(air_tight)
 		density = TRUE
+		if(!(flags_1 & ON_BORDER_1))//NSV but not border firelocks
+			flags_1 |= PREVENT_CLICK_UNDER_1//NSV make it so prevent_click_under doesn't need density
 	sleep(open_speed)
 	density = TRUE
+	if(!(flags_1 & ON_BORDER_1))//NSV but not border firelocks
+		flags_1 |= PREVENT_CLICK_UNDER_1//NSV make it so prevent_click_under doesn't need density
 	sleep(open_speed)
 	update_icon()
 	if(visible && !glass)
@@ -392,7 +402,7 @@
 		close()
 
 /obj/machinery/door/proc/autoclose_in(wait)
-	addtimer(CALLBACK(src, .proc/autoclose), wait, TIMER_UNIQUE | TIMER_NO_HASH_WAIT | TIMER_OVERRIDE)
+	addtimer(CALLBACK(src, PROC_REF(autoclose)), wait, TIMER_UNIQUE | TIMER_NO_HASH_WAIT | TIMER_OVERRIDE)
 
 /// Is the ID Scan wire cut, or has the AI disabled it?
 /// This has a variety of non-uniform effects - it doesn't simply grant access.

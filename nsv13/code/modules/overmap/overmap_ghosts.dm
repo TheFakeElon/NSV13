@@ -16,7 +16,7 @@
 			if("Cancel")
 				return
 			if("Open")
-				var/list/mob/dead/observer/candidates = pollGhostCandidates("Do you wish to pilot a [src.faction] [src.name]?", ROLE_GHOSTSHIP, null, null, 20 SECONDS, POLL_IGNORE_GHOSTSHIP)
+				var/list/mob/dead/observer/candidates = pollGhostCandidates("Do you wish to pilot a [src.faction] [src.name]?", ROLE_GHOSTSHIP, /datum/role_preference/midround_ghost/ghost_ship, 20 SECONDS, POLL_IGNORE_GHOSTSHIP)
 				if(LAZYLEN(candidates))
 					var/mob/dead/observer/C = pick(candidates)
 					target_ghost = C
@@ -52,6 +52,9 @@
 	if(gunner)
 		QDEL_NULL(gunner)
 
+	//Buff the ships
+	spec_ghostship_changes()
+
 	//Insert the extra machines
 	if(!dradis)
 		if(mass >= MASS_SMALL)
@@ -64,6 +67,11 @@
 		tactical = new /obj/machinery/computer/ship/tactical/internal(src)
 		tactical.linked = src
 
+	//Lets ships with gauss use them
+	if(weapon_types[FIRE_MODE_GAUSS])
+		var/datum/ship_weapon/GA = weapon_types[FIRE_MODE_GAUSS]
+		GA.allowed_roles = OVERMAP_USER_ROLE_GUNNER
+
 	//Override AMS
 	weapon_types[FIRE_MODE_AMS] = null //Resolve this later to be auto
 	weapon_types[FIRE_MODE_FLAK] = null //Resolve this later to be a toggle
@@ -75,6 +83,10 @@
 	ghost.real_name = src.name
 	ghost.hud_type = /datum/hud //Mostly blank hud
 	ghost.key = target.key
+
+	//More or less a modified version of how the morph antag gets the antag datum.
+	if(ghost.mind)
+		ghost.mind.add_antag_datum(/datum/antagonist/ghost_ship)
 
 	//Allows player to hear hails
 	mobs_in_ship += ghost
@@ -97,4 +109,17 @@
 		ghost_controlled = TRUE
 
 	else //Try again later
-		addtimer(CALLBACK(src, .proc/ghost_key_check, ghost), 1 SECONDS)
+		addtimer(CALLBACK(src, PROC_REF(ghost_key_check), ghost), 1 SECONDS)
+
+/obj/structure/overmap/proc/spec_ghostship_changes() //Proc to buff ghost ships. Currently handles only fighters. Override if you want
+	if(mass == MASS_TINY) //Makes dogfighting fun
+		obj_integrity *= 6
+		max_integrity *= 6 //About as squishy, and fast, as a light fighter
+		forward_maxthrust *= 3.5
+		backward_maxthrust *= 3.5
+		side_maxthrust *= 2
+		integrity_failure *= 3.5
+		max_angular_acceleration *= 2
+		speed_limit *= 2.5
+		shots_left = 500 //Having 15 max cannon shots isn't fun
+

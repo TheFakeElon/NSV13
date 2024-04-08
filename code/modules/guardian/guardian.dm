@@ -581,7 +581,7 @@ GLOBAL_LIST_EMPTY(parasites) //all currently existing/living guardians
 
 /mob/living/simple_animal/hostile/guardian/proc/ResetMe()
 	set waitfor = FALSE
-	var/list/mob/dead/observer/candidates = pollGhostCandidates("Do you want to play as [summoner?.current?.name]'s [real_name]?", ROLE_HOLOPARASITE, null, FALSE, 10 SECONDS)
+	var/list/mob/dead/observer/candidates = pollGhostCandidates("Do you want to play as [summoner?.current?.name]'s [real_name]?", ROLE_HOLOPARASITE, null, 10 SECONDS)
 	if(LAZYLEN(candidates))
 		var/mob/dead/observer/C = pick(candidates)
 		key = C.key
@@ -608,8 +608,8 @@ GLOBAL_LIST_EMPTY(parasites) //all currently existing/living guardians
 			return
 		forceMove(new_body)
 		Reviveify()
-		RegisterSignal(new_body, COMSIG_MOVABLE_MOVED, /mob/living/simple_animal/hostile/guardian.proc/OnMoved)
-		RegisterSignal(new_body, COMSIG_LIVING_REVIVE, /mob/living/simple_animal/hostile/guardian.proc/Reviveify)
+		RegisterSignal(new_body, COMSIG_MOVABLE_MOVED, TYPE_PROC_REF(/mob/living/simple_animal/hostile/guardian, OnMoved))
+		RegisterSignal(new_body, COMSIG_LIVING_REVIVE, TYPE_PROC_REF(/mob/living/simple_animal/hostile/guardian, Reviveify))
 		to_chat(src, "<span class='notice'>You manifest into existence, as your master's soul appears in a new body!</span>")
 		new_body.add_verb(/mob/living/proc/guardian_comm)
 		new_body.add_verb(/mob/living/proc/guardian_recall)
@@ -674,7 +674,7 @@ GLOBAL_LIST_EMPTY(parasites) //all currently existing/living guardians
 					return
 				G.next_reset = world.time + GUARDIAN_RESET_COOLDOWN
 			to_chat(src, "<span class='holoparasite'>You attempt to reset <font color=\"[G.guardiancolor]\"><b>[G.real_name]</b></font>'s personality...</span>")
-			var/list/mob/dead/observer/candidates = pollGhostCandidates("Do you want to play as [src.real_name]'s [G.real_name]?", ROLE_HOLOPARASITE, null, FALSE, 100)
+			var/list/mob/dead/observer/candidates = pollGhostCandidates("Do you want to play as [src.real_name]'s [G.real_name]?", ROLE_HOLOPARASITE, null, 10 SECONDS)
 			if(LAZYLEN(candidates))
 				var/mob/dead/observer/C = pick(candidates)
 				to_chat(G, "<span class='holoparasite'>Your user reset you, and your body was taken over by a ghost. Looks like they weren't happy with your performance.</span>")

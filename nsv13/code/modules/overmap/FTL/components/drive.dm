@@ -42,7 +42,7 @@
 	var/ftl_start = 'nsv13/sound/effects/ship/FTL_long_thirring.ogg'
 	var/ftl_exit = 'nsv13/sound/effects/ship/freespace2/warp_close.wav'
 	var/datum/looping_sound/advanced/ftl_drive/soundloop
-	var/auto_spool_capable = FALSE // whether the drive is capable of auto spooling or not
+	var/auto_spool_capable = TRUE // whether the drive is capable of auto spooling or not
 	var/auto_spool_enabled = FALSE // whether the drive is set to auto spool or not
 	var/lockout = FALSE //Used for our end round shenanigains
 
@@ -55,7 +55,7 @@
 	radio.keyslot = new radio_key
 	radio.listening = 0
 	radio.recalculateChannels()
-	soundloop = new(list(src), FALSE, FALSE, CHANNEL_FTL_MANIFOLD, TRUE)
+	soundloop = new(src, FALSE, FALSE, CHANNEL_FTL_MANIFOLD, TRUE)
 	STOP_PROCESSING(SSmachines, src)
 	return INITIALIZE_HINT_LATELOAD
 
@@ -70,6 +70,11 @@
 	linked?.ftl_drive = null
 	pylons = null
 	return ..()
+
+/obj/machinery/computer/ship/ftl_core/swarmer_act(mob/living/simple_animal/hostile/swarmer/S)
+	to_chat(S, "<span class='warning'>This equipment should be preserved, it will be a useful resource to our masters in the future. Aborting.</span>")
+	S.LoseTarget()
+	return FALSE
 
 /// Links with available pylons and returns number of connections
 /obj/machinery/computer/ship/ftl_core/proc/get_pylons()
@@ -306,6 +311,7 @@ Preset classes of FTL drive with pre-programmed behaviours
 		pylon_info["gyro"] = round(P.gyro_speed / P.req_gyro_speed, 0.01)
 		pylon_info["capacitor"] = round(P.capacitor / P.req_capacitor, 0.01)
 		pylon_info["draw"] = display_power(P.power_draw)
+		pylon_info["nucleium"] = round(P.get_nucleium_use() / 2, 0.01) //Converted into mol / second, SSmachines runs every 2 seconds.
 		pylon_info["shielded"] = P.shielded
 		all_pylon_info[++all_pylon_info.len] = pylon_info // Unfortunately, this is currently the best way to embed lists
 	data["pylons"] = all_pylon_info
@@ -318,7 +324,7 @@ Preset classes of FTL drive with pre-programmed behaviours
 	if(!target_system)
 		radio.talk_into(src, "ERROR. Specified star_system no longer exists.", radio_channel)
 		return
-	linked?.begin_jump(target_system, force)
+	linked.begin_jump(target_system, force)
 	playsound(src, 'nsv13/sound/voice/ftl_start.wav', 100, FALSE)
 	radio.talk_into(src, "Initiating FTL translation.", radio_channel)
 	playsound(src, 'nsv13/sound/effects/ship/freespace2/computer/escape.wav', 100, 1)
@@ -355,11 +361,13 @@ Preset classes of FTL drive with pre-programmed behaviours
 	progress = 0
 	soundloop.interrupt()
 	jump_speed_pylon = initial(jump_speed_pylon)
-	if(shutdown_pylons)
+	if(shutdown_pylons && !auto_spool_enabled)
 		for(var/obj/machinery/atmospherics/components/binary/drive_pylon/P as() in pylons)
+			if(P.pylon_state == PYLON_STATE_OFFLINE || P.pylon_state == PYLON_STATE_SHUTDOWN)
+				continue
 			P.set_state(PYLON_STATE_SHUTDOWN)
 	cooldown = TRUE
-	addtimer(CALLBACK(src, .proc/post_cooldown, auto_spool_enabled), FTL_COOLDOWN)
+	addtimer(CALLBACK(src, PROC_REF(post_cooldown), auto_spool_enabled), FTL_COOLDOWN)
 	STOP_PROCESSING(SSmachines, src)
 	return TRUE
 

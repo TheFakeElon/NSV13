@@ -115,12 +115,12 @@
 	var/recent_queen_death = 0 //Indicates if the queen died recently, aliens are heavily weakened while this is active.
 
 /obj/item/organ/alien/hivenode/Insert(mob/living/carbon/M, special = 0)
-	M.faction |= ROLE_ALIEN
+	M.faction |= FACTION_ALIEN
 	ADD_TRAIT(M, TRAIT_XENO_IMMUNE, "xeno immune")
 	return ..()
 
 /obj/item/organ/alien/hivenode/Remove(mob/living/carbon/M, special = 0)
-	M.faction -= ROLE_ALIEN
+	M.faction -= FACTION_ALIEN
 	REMOVE_TRAIT(M, TRAIT_XENO_IMMUNE, "xeno immune")
 	return ..()
 
@@ -145,7 +145,7 @@
 
 	recent_queen_death = TRUE
 	owner.throw_alert("alien_noqueen", /atom/movable/screen/alert/alien_vulnerable)
-	addtimer(CALLBACK(src, .proc/clear_queen_death), QUEEN_DEATH_DEBUFF_DURATION)
+	addtimer(CALLBACK(src, PROC_REF(clear_queen_death)), QUEEN_DEATH_DEBUFF_DURATION)
 
 
 /obj/item/organ/alien/hivenode/proc/clear_queen_death()

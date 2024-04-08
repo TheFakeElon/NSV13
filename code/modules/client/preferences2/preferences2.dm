@@ -77,14 +77,14 @@
 	READPREF_RAW(ghost_orbit, PREFERENCE_TAG_GHOST_ORBIT)
 	READPREF_RAW(ghost_accs, PREFERENCE_TAG_GHOST_ACCS)
 	READPREF_RAW(ghost_others, PREFERENCE_TAG_GHOST_OTHERS)
-	READPREF_RAW(pda_style, PREFERENCE_TAG_PDA_STYLE)
+	READPREF_RAW(pda_theme, PREFERENCE_TAG_PDA_THEME)
 	READPREF_RAW(pda_color, PREFERENCE_TAG_PDA_COLOUR)
 	READPREF_RAW(preferred_syndie_role, PREFERENCE_TAG_PREFERRED_SYNDIE_ROLE) //NSV13
 
 	READPREF_JSONDEC(ignoring, PREFERENCE_TAG_IGNORING)
 	READPREF_JSONDEC(key_bindings, PREFERENCE_TAG_KEYBINDS)
 	READPREF_JSONDEC(purchased_gear, PREFERENCE_TAG_PURCHASED_GEAR)
-	READPREF_JSONDEC(be_special, PREFERENCE_TAG_BE_SPECIAL)
+	READPREF_JSONDEC(role_preferences, PREFERENCE_TAG_ROLE_PREFERENCES)
 
 	//Sanitize
 	asaycolor		= sanitize_ooccolor(sanitize_hexcolor(asaycolor, 6, TRUE, initial(asaycolor)))
@@ -104,9 +104,16 @@
 	ghost_orbit 	= sanitize_inlist(ghost_orbit, GLOB.ghost_orbits, initial(ghost_orbit))
 	ghost_accs		= sanitize_inlist(ghost_accs, GLOB.ghost_accs_options, GHOST_ACCS_DEFAULT_OPTION)
 	ghost_others	= sanitize_inlist(ghost_others, GLOB.ghost_others_options, GHOST_OTHERS_DEFAULT_OPTION)
-	be_special		= SANITIZE_LIST(be_special)
+	role_preferences		= SANITIZE_LIST(role_preferences)
+	// Remove any invalid entries
+	for(var/preference in role_preferences)
+		var/path = text2path(preference)
+		var/datum/role_preference/entry = GLOB.role_preference_entries[path]
+		if(istype(entry) && !entry.per_character)
+			continue
+		role_preferences -= preference
 
-	pda_style		= sanitize_inlist(pda_style, GLOB.pda_styles, initial(pda_style))
+	pda_theme		= sanitize_inlist(pda_theme, GLOB.ntos_device_themes_default_content, initial(pda_theme))
 	pda_color		= sanitize_hexcolor(pda_color, 6, TRUE, initial(pda_color))
 	preferred_syndie_role = sanitize_text(preferred_syndie_role, CONQUEST_ROLE_GRUNT) //NSV13
 
@@ -147,7 +154,7 @@
 	PREP_WRITEPREF_RAW(parallax, PREFERENCE_TAG_PARALLAX)
 	PREP_WRITEPREF_RAW(pixel_size, PREFERENCE_TAG_PIXELSIZE)
 	PREP_WRITEPREF_RAW(tip_delay, PREFERENCE_TAG_TIP_DELAY)
-	PREP_WRITEPREF_RAW(pda_style, PREFERENCE_TAG_PDA_STYLE)
+	PREP_WRITEPREF_RAW(pda_theme, PREFERENCE_TAG_PDA_THEME)
 	PREP_WRITEPREF_RAW(pda_color, PREFERENCE_TAG_PDA_COLOUR)
 	PREP_WRITEPREF_RAW(preferred_syndie_role, PREFERENCE_TAG_PREFERRED_SYNDIE_ROLE) //NSV13
 
@@ -166,7 +173,7 @@
 	PREP_WRITEPREF_JSONENC(ignoring, PREFERENCE_TAG_IGNORING)
 	PREP_WRITEPREF_JSONENC(key_bindings, PREFERENCE_TAG_KEYBINDS)
 	PREP_WRITEPREF_JSONENC(purchased_gear, PREFERENCE_TAG_PURCHASED_GEAR)
-	PREP_WRITEPREF_JSONENC(be_special, PREFERENCE_TAG_BE_SPECIAL)
+	PREP_WRITEPREF_JSONENC(role_preferences, PREFERENCE_TAG_ROLE_PREFERENCES)
 
 	// QuerySelect can execute many queries at once. That name is dumb but w/e
 	SSdbcore.QuerySelect(write_queries, TRUE, TRUE)
@@ -215,7 +222,13 @@
 			equipped_gear,
 			preferred_squad,
 			preferred_pilot_role,
-			flavor_text
+			flavor_text,
+			lizard_hiss_style,
+			silicon_flavor_text,
+			general_record,
+			security_record,
+			medical_record,
+			role_preferences
 		FROM [format_table_name("characters")] WHERE
 			ckey=:ckey
 	"}, list("ckey" = parent.ckey))

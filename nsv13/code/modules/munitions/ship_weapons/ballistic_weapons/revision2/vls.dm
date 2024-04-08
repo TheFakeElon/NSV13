@@ -48,27 +48,21 @@
 	circuit = /obj/item/circuitboard/machine/vls
 	var/obj/structure/fluff/vls_hatch/hatch = null
 
-/obj/machinery/ship_weapon/vls/proc/on_entered(datum/source, atom/movable/AM, oldloc)
+/obj/machinery/ship_weapon/vls/proc/on_entered(datum/source, atom/movable/torp, oldloc)
 	SIGNAL_HANDLER
 
-	var/can_shoot_this = FALSE
-	for(var/_ammo_type in ammo_type)
-		if(istype(AM, _ammo_type))
-			can_shoot_this = TRUE
-			break
+	if(!is_type_in_list(torp, ammo_type))
+		return FALSE
 
-	if(can_shoot_this)
-		if(ammo?.len >= max_ammo)
-			return FALSE
-		if(loading)
-			return FALSE
-		if(state >= 2)
-			return FALSE
-		ammo += AM
-		AM.forceMove(src)
-		if(load_sound)
-			playsound(src, load_sound, 100, 1)
-		state = 2
+	if(ammo?.len >= max_ammo)
+		return FALSE
+	if(loading)
+		return FALSE
+	if(oldloc == src)// stops torps from getting sent back in instantly
+		return FALSE
+	if(state >= STATE_LOADED)
+		return FALSE
+	load(torp)
 
 // Handles removal of stuff
 /obj/machinery/ship_weapon/vls/Exited(atom/movable/gone, direction)
@@ -97,7 +91,7 @@
 /obj/machinery/ship_weapon/vls/Initialize(mapload)
 	. = ..()
 	var/static/list/loc_connections = list(
-		COMSIG_ATOM_ENTERED = .proc/on_entered,
+		COMSIG_ATOM_ENTERED = PROC_REF(on_entered),
 	)
 	AddElement(/datum/element/connect_loc, loc_connections)
 	var/turf/T = SSmapping.get_turf_above(src)
@@ -140,12 +134,11 @@
 		return
 	hatch.toggle(HT_CLOSED)
 
-/obj/machinery/ship_weapon/vls/unload_magazine()
+/obj/machinery/ship_weapon/vls/unload()
 	. = ..()
 	if(!hatch)
 		return
 	hatch.toggle(HT_CLOSED)
-
 
 /obj/structure/fluff/vls_hatch
 	name = "VLS Launch Hatch"
@@ -211,6 +204,7 @@
 		return FALSE
 	// OM.fire_weapon(target, mode=weapon_type, lateral=TRUE)
 	weapon_type.fire( target )
+	OM.ams_shots_fired += 1
 	OM.next_ams_shot = world.time + OM.ams_targeting_cooldown
 
 //Subtypes.
@@ -227,6 +221,11 @@
 			return list(OM.target_lock)
 		return list()
 	. = ..()
+
+/datum/ams_mode/sts/handle_autonomy(obj/structure/overmap/OM, datum/ship_weapon/weapon_type)
+	if(OM.ams_shot_limit <= OM.ams_shots_fired)
+		return FALSE
+	return ..()
 
 /datum/ams_mode/countermeasures
 	name = "Anti-missile countermeasures"
@@ -247,8 +246,8 @@
 /obj/machinery/computer/ams/ui_act(action, params)
 	if(..())
 		return
+	var/obj/structure/overmap/linked = get_overmap()
 	if(action == "data_source")
-		var/obj/structure/overmap/linked = get_overmap()
 		if(!linked)
 			return
 		if(linked.ams_data_source == AMS_LOCKED_TARGETS)
@@ -256,10 +255,15 @@
 			return
 		linked.ams_data_source = AMS_LOCKED_TARGETS
 		return
-	var/datum/ams_mode/target = locate(params["target"])
-	if(!target)
-		return FALSE
-	target.enabled = !target.enabled
+	if(action == "set_shot_limit")
+		linked.ams_shot_limit = sanitize_integer(params["shot_limit"], 1, 100, 5)
+		return
+	if(action == "select")
+		var/datum/ams_mode/target = locate(params["target"])
+		if(!target)
+			return FALSE
+		linked.ams_shots_fired = 0
+		target.enabled = !target.enabled
 
 /obj/machinery/computer/ams/ui_data(mob/user)
 	..()
@@ -278,6 +282,7 @@
 		categories[++categories.len] = category
 	data["categories"] = categories
 	data["data_source"] = OM.ams_data_source
+	data["shot_limit"] = OM.ams_shot_limit
 	return data
 
 /obj/machinery/computer/ams/ui_interact(mob/user, datum/tgui/ui)
@@ -443,7 +448,7 @@
 /obj/structure/overmap/proc/on_missile_lock(obj/structure/overmap/firer, obj/item/projectile/proj)
 	add_enemy(firer)
 	torpedoes_to_target += proj
-	RegisterSignal(proj, COMSIG_PARENT_QDELETING, .proc/remove_torpedo_target)
+	RegisterSignal(proj, COMSIG_PARENT_QDELETING, PROC_REF(remove_torpedo_target))
 	if(dradis)
 		dradis.relay_sound('nsv13/sound/effects/fighters/launchwarning.ogg')
 		if(COOLDOWN_FINISHED(dradis, last_missile_warning))

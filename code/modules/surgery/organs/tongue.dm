@@ -44,13 +44,13 @@
 
 /obj/item/organ/tongue/Insert(mob/living/carbon/M, special = 0)
 	if(modifies_speech)
-		RegisterSignal(M, COMSIG_MOB_SAY, .proc/handle_speech)
+		RegisterSignal(M, COMSIG_MOB_SAY, PROC_REF(handle_speech))
 	M.UnregisterSignal(M, COMSIG_MOB_SAY)
 	return ..()
 
 /obj/item/organ/tongue/Remove(mob/living/carbon/M, special = 0)
-	UnregisterSignal(M, COMSIG_MOB_SAY, .proc/handle_speech)
-	M.RegisterSignal(M, COMSIG_MOB_SAY, /mob/living/carbon/.proc/handle_tongueless_speech)
+	UnregisterSignal(M, COMSIG_MOB_SAY, PROC_REF(handle_speech))
+	M.RegisterSignal(M, COMSIG_MOB_SAY, TYPE_PROC_REF(/mob/living/carbon, handle_tongueless_speech))
 	return ..()
 
 /obj/item/organ/tongue/could_speak_language(datum/language/dt)
@@ -77,10 +77,11 @@
 	if(message[1] != "*")
 		message = lizard_hiss.Replace(message, "sss")
 		message = lizard_hiSS.Replace(message, "SSS")
-		message = lizard_kss.Replace(message, "$1kss")
-		message = lizard_kSS.Replace(message, "$1KSS")
-		message = lizard_ecks.Replace(message, "ecks$1")
-		message = lizard_eckS.Replace(message, "ECKS$1")
+		if(owner?.client?.prefs.active_character?.lizard_hiss_style != LIZARD_HISS_LEGACY)
+			message = lizard_kss.Replace(message, "$1kss")
+			message = lizard_kSS.Replace(message, "$1KSS")
+			message = lizard_ecks.Replace(message, "ecks$1")
+			message = lizard_eckS.Replace(message, "ECKS$1")
 	speech_args[SPEECH_MESSAGE] = message
 
 /obj/item/organ/tongue/fly

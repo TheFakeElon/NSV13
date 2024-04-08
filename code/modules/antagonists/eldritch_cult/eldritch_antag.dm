@@ -3,7 +3,8 @@
 	roundend_category = "Heretics"
 	antagpanel_category = "Heretic"
 	antag_moodlet = /datum/mood_event/heretics
-	job_rank = ROLE_HERETIC
+	banning_key = ROLE_HERETIC
+	required_living_playtime = 4
 	var/antag_hud_type = ANTAG_HUD_HERETIC // someone make all the other antags conform to this too lol
 	var/antag_hud_name = "heretic"
 	hijack_speed = 0.5
@@ -156,7 +157,7 @@
 
 /datum/antagonist/heretic/get_admin_commands()
 	. = ..()
-	.["Equip"] = CALLBACK(src,.proc/equip_cultist)
+	.["Equip"] = CALLBACK(src,PROC_REF(equip_cultist))
 
 /datum/antagonist/heretic/roundend_report()
 	var/list/parts = list()

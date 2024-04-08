@@ -70,7 +70,7 @@ remove_in: Optional arg, if > 0: Will remove the effect in that amount of ticks
 	sensor_profile += penalty
 	if(remove_in < 1)
 		return
-	addtimer(CALLBACK(src, .proc/remove_sensor_profile_penalty, penalty), remove_in)
+	addtimer(CALLBACK(src, PROC_REF(remove_sensor_profile_penalty), penalty), remove_in)
 
 /*
 Reduces sensor profile by the amount given as arg.
@@ -136,16 +136,17 @@ Called by add_sensor_profile_penalty if remove_in is used.
 /obj/machinery/computer/ship/dradis/minor/cargo/Initialize(mapload)
 	. = ..()
 	var/obj/item/paper/paper = new /obj/item/paper(get_turf(src))
-	paper.info = ""
-	paper.info += "<h2>How to perform deliveries with the Cargo DRADIS</h2>"
-	paper.info += "<hr/><br/>"
-	paper.info += "Step 1: Find or build a freight torpedo.<br/><br/>"
-	paper.info += "Step 2: Load your contents directly into the freight torpedo. Or load your contents into a crate, then load the crate into the freight torpedo (click drag the object onto the torpedo).<br/><br/>"
-	paper.info += "Step 3: Load the freight torpedo into the Cargo freight launcher (click drag the torpedo onto the launcher). You may need to use a munitions trolley to move the freight torpedo closer.<br/><br/>"
-	paper.info += "Step 4: Use the munitions console to load the payload, chamber the payload, and disable weapon safeties.<br/><br/>"
-	paper.info += "Step 5: Put on hearing protection gear, such as earmuffs.<br/><br/>"
-	paper.info += "Step 6: Navigate to the cargo DRADIS, and click on the recipient. If the payload is malformed or not chambered, an error will display. If the payload is properly chambered, a final confirmation will display. Click Yes.<br/><br/>"
-	paper.update_icon()
+	var/final_paper_text = ""
+	final_paper_text += "<h2>How to perform deliveries with the Cargo DRADIS</h2>"
+	final_paper_text += "<hr/><br/>"
+	final_paper_text += "Step 1: Find or build a freight torpedo.<br/><br/>"
+	final_paper_text += "Step 2: Load your contents directly into the freight torpedo. Or load your contents into a crate, then load the crate into the freight torpedo (click drag the object onto the torpedo).<br/><br/>"
+	final_paper_text += "Step 3: Load the freight torpedo into the Cargo freight launcher (click drag the torpedo onto the launcher). You may need to use a munitions trolley to move the freight torpedo closer.<br/><br/>"
+	final_paper_text += "Step 4: Use the munitions console to load the payload, chamber the payload, and disable weapon safeties.<br/><br/>"
+	final_paper_text += "Step 5: Put on hearing protection gear, such as earmuffs.<br/><br/>"
+	final_paper_text += "Step 6: Navigate to the cargo DRADIS, and click on the recipient. If the payload is malformed or not chambered, an error will display. If the payload is properly chambered, a final confirmation will display. Click Yes.<br/><br/>"
+	paper.add_raw_text(final_paper_text)
+	paper.update_appearance()
 	sensor_range = hail_range
 
 	if(!linked_launcher)
@@ -193,7 +194,7 @@ Called by add_sensor_profile_penalty if remove_in is used.
 	return linked
 
 /obj/machinery/computer/ship/dradis/minor/set_position(obj/structure/overmap/OM)
-	RegisterSignal(OM, COMSIG_FTL_STATE_CHANGE, .proc/reset_dradis_contacts, override=TRUE)
+	RegisterSignal(OM, COMSIG_FTL_STATE_CHANGE, PROC_REF(reset_dradis_contacts), override=TRUE)
 
 /datum/looping_sound/dradis
 	mid_sounds = list('nsv13/sound/effects/ship/dradis.ogg')
@@ -205,7 +206,7 @@ Called by add_sensor_profile_penalty if remove_in is used.
 
 /obj/machinery/computer/ship/dradis/set_position(obj/structure/overmap/OM) //This tells our overmap what kind of console we are. This is useful as pilots need to see the dradis pop-up as they enter the ship view.
 	OM.dradis = src
-	RegisterSignal(OM, COMSIG_FTL_STATE_CHANGE, .proc/reset_dradis_contacts, override=TRUE)
+	RegisterSignal(OM, COMSIG_FTL_STATE_CHANGE, PROC_REF(reset_dradis_contacts), override=TRUE)
 
 /obj/machinery/computer/ship/dradis/proc/reset_dradis_contacts()
 	last_ship_count = 0
@@ -361,7 +362,7 @@ Called by add_sensor_profile_penalty if remove_in is used.
 				return
 			animate(src, 15, alpha = 255)
 			mouse_opacity = TRUE
-			addtimer(CALLBACK(src, .proc/handle_cloak, TRUE), 15 SECONDS)
+			addtimer(CALLBACK(src, PROC_REF(handle_cloak), TRUE), 15 SECONDS)
 
 /obj/machinery/computer/ship/dradis/ui_data(mob/user) //NEW AND IMPROVED DRADIS 2.0. NOW FEATURING LESS LAG AND CLICKSPAM. ~~This was a pain to code. Don't make me do it again..please? -Kmc~~ 2020 Kmc here, I recoded it. You're right! It was painful, also your code sucked :)
 	var/list/data = list()
